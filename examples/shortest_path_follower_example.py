@@ -63,17 +63,21 @@ def shortest_path_example(mode):
     config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
     config.defrost()
     config.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
+    config.TASK.MEASUREMENTS.append("NDTW")
     config.TASK.SENSORS.append("HEADING_SENSOR")
+    config.DATASET.SPLIT = "val"
     config.freeze()
     env = SimpleRLEnv(config=config)
     goal_radius = env.episodes[0].goals[0].radius
     if goal_radius is None:
         goal_radius = config.SIMULATOR.FORWARD_STEP_SIZE
+
+    goal_radius = 0.15
     follower = ShortestPathFollower(env.habitat_env.sim, goal_radius, False)
     follower.mode = mode
 
     print("Environment creation successful")
-    for episode in range(3):
+    for episode in range(100):
         env.reset()
         dirname = os.path.join(
             IMAGE_DIR, "shortest_path_example", mode, "%02d" % episode
@@ -94,6 +98,9 @@ def shortest_path_example(mode):
             )
             output_im = np.concatenate((im, top_down_map), axis=1)
             images.append(output_im)
+
+        print(info["ndtw"])
+        print(info["spl"])
         images_to_video(images, dirname, "trajectory")
         print("Episode finished")
 

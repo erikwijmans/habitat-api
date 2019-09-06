@@ -5,5 +5,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from habitat.tasks.nav.nav_task import NavigationTask
+from habitat.tasks.nav.ndtw import NDTW
 
 __all__ = ["NavigationTask"]
