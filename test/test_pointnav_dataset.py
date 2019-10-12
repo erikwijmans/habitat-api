@@ -18,14 +18,14 @@ from habitat.core.embodied_task import Episode
 from habitat.core.logging import logger
 from habitat.datasets import make_dataset
 from habitat.datasets.pointnav.pointnav_dataset import (
-    DEFAULT_SCENE_PATH_PREFIX,
+    DEFAULT_scene_PATH_PREFIX,
     PointNavDatasetV1,
 )
 from habitat.utils.geometry_utils import quaternion_xyzw_to_wxyz
 
 CFG_TEST = "configs/test/habitat_all_sensors_test.yaml"
 CFG_MULTI_TEST = "configs/datasets/pointnav/gibson.yaml"
-PARTIAL_LOAD_SCENES = 3
+PARTIAL_LOAD_sceneS = 3
 NUM_EPISODES = 10
 
 
@@ -46,7 +46,7 @@ def check_json_serializaiton(dataset: habitat.Dataset):
 
 
 def test_single_pointnav_dataset():
-    dataset_config = get_config().DATASET
+    dataset_config = get_config().dataset
     if not PointNavDatasetV1.check_config_paths_exist(dataset_config):
         pytest.skip("Test skipped as dataset files are missing.")
     scenes = PointNavDatasetV1.get_scenes_to_load(config=dataset_config)
@@ -62,7 +62,7 @@ def test_single_pointnav_dataset():
 
 
 def test_multiple_files_scene_path():
-    dataset_config = get_config(CFG_MULTI_TEST).DATASET
+    dataset_config = get_config(CFG_MULTI_TEST).dataset
     if not PointNavDatasetV1.check_config_paths_exist(dataset_config):
         pytest.skip("Test skipped as dataset files are missing.")
     scenes = PointNavDatasetV1.get_scenes_to_load(config=dataset_config)
@@ -70,16 +70,16 @@ def test_multiple_files_scene_path():
         len(scenes) > 0
     ), "Expected dataset contains separate episode file per scene."
     dataset_config.defrost()
-    dataset_config.CONTENT_SCENES = scenes[:PARTIAL_LOAD_SCENES]
-    dataset_config.SCENES_DIR = os.path.join(
-        os.getcwd(), DEFAULT_SCENE_PATH_PREFIX
+    dataset_config.CONTENT_sceneS = scenes[:PARTIAL_LOAD_sceneS]
+    dataset_config.sceneS_DIR = os.path.join(
+        os.getcwd(), DEFAULT_scene_PATH_PREFIX
     )
     dataset_config.freeze()
     partial_dataset = make_dataset(
-        id_dataset=dataset_config.TYPE, config=dataset_config
+        id_dataset=dataset_config.type, config=dataset_config
     )
     assert (
-        len(partial_dataset.scene_ids) == PARTIAL_LOAD_SCENES
+        len(partial_dataset.scene_ids) == PARTIAL_LOAD_sceneS
     ), "Number of loaded scenes doesn't correspond."
     print(partial_dataset.episodes[0].scene_id)
     assert os.path.exists(
@@ -90,7 +90,7 @@ def test_multiple_files_scene_path():
 
 
 def test_multiple_files_pointnav_dataset():
-    dataset_config = get_config(CFG_MULTI_TEST).DATASET
+    dataset_config = get_config(CFG_MULTI_TEST).dataset
     if not PointNavDatasetV1.check_config_paths_exist(dataset_config):
         pytest.skip("Test skipped as dataset files are missing.")
     scenes = PointNavDatasetV1.get_scenes_to_load(config=dataset_config)
@@ -98,13 +98,13 @@ def test_multiple_files_pointnav_dataset():
         len(scenes) > 0
     ), "Expected dataset contains separate episode file per scene."
     dataset_config.defrost()
-    dataset_config.CONTENT_SCENES = scenes[:PARTIAL_LOAD_SCENES]
+    dataset_config.CONTENT_sceneS = scenes[:PARTIAL_LOAD_sceneS]
     dataset_config.freeze()
     partial_dataset = make_dataset(
-        id_dataset=dataset_config.TYPE, config=dataset_config
+        id_dataset=dataset_config.type, config=dataset_config
     )
     assert (
-        len(partial_dataset.scene_ids) == PARTIAL_LOAD_SCENES
+        len(partial_dataset.scene_ids) == PARTIAL_LOAD_sceneS
     ), "Number of loaded scenes doesn't correspond."
     check_json_serializaiton(partial_dataset)
 
@@ -138,18 +138,18 @@ def check_shortest_path(env, episode):
 def test_pointnav_episode_generator():
     config = get_config(CFG_TEST)
     config.defrost()
-    config.DATASET.SPLIT = "val"
-    config.ENVIRONMENT.MAX_EPISODE_STEPS = 500
+    config.dataset.split = "val"
+    config.environment.max_episode_steps = 500
     config.freeze()
-    if not PointNavDatasetV1.check_config_paths_exist(config.DATASET):
+    if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
         pytest.skip("Test skipped as dataset files are missing.")
     env = habitat.Env(config)
-    env.seed(config.SEED)
-    random.seed(config.SEED)
+    env.seed(config.seed)
+    random.seed(config.seed)
     generator = pointnav_generator.generate_pointnav_episode(
         sim=env.sim,
-        shortest_path_success_distance=config.TASK.SUCCESS_DISTANCE,
-        shortest_path_max_steps=config.ENVIRONMENT.MAX_EPISODE_STEPS,
+        shortest_path_success_distance=config.task.success_distance,
+        shortest_path_max_steps=config.environment.max_episode_steps,
     )
     episodes = []
     for i in range(NUM_EPISODES):
@@ -159,8 +159,8 @@ def test_pointnav_episode_generator():
     for episode in pointnav_generator.generate_pointnav_episode(
         sim=env.sim,
         num_episodes=NUM_EPISODES,
-        shortest_path_success_distance=config.TASK.SUCCESS_DISTANCE,
-        shortest_path_max_steps=config.ENVIRONMENT.MAX_EPISODE_STEPS,
+        shortest_path_success_distance=config.task.success_distance,
+        shortest_path_max_steps=config.environment.max_episode_steps,
         geodesic_to_euclid_min_ratio=0,
     ):
         episodes.append(episode)

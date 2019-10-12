@@ -14,6 +14,7 @@ We will use the strafe action outline in the habitat_sim example
 
 import attr
 import numpy as np
+import omegaconf
 
 import habitat
 import habitat_sim
@@ -97,11 +98,11 @@ class NoNoiseStrafe(HabitatSimV1ActionSpaceConfiguration):
     def get(self):
         config = super().get()
 
-        config[HabitatSimActions.STRAFE_LEFT] = habitat_sim.ActionSpec(
+        config[HabitatSimActions.strafe_left] = habitat_sim.ActionSpec(
             "noisy_strafe_left",
             NoisyStrafeActuationSpec(0.25, noise_amount=0.0),
         )
-        config[HabitatSimActions.STRAFE_RIGHT] = habitat_sim.ActionSpec(
+        config[HabitatSimActions.strafe_right] = habitat_sim.ActionSpec(
             "noisy_strafe_right",
             NoisyStrafeActuationSpec(0.25, noise_amount=0.0),
         )
@@ -114,11 +115,11 @@ class NoiseStrafe(HabitatSimV1ActionSpaceConfiguration):
     def get(self):
         config = super().get()
 
-        config[HabitatSimActions.STRAFE_LEFT] = habitat_sim.ActionSpec(
+        config[HabitatSimActions.strafe_left] = habitat_sim.ActionSpec(
             "noisy_strafe_left",
             NoisyStrafeActuationSpec(0.25, noise_amount=0.05),
         )
-        config[HabitatSimActions.STRAFE_RIGHT] = habitat_sim.ActionSpec(
+        config[HabitatSimActions.strafe_right] = habitat_sim.ActionSpec(
             "noisy_strafe_right",
             NoisyStrafeActuationSpec(0.25, noise_amount=0.05),
         )
@@ -132,7 +133,7 @@ class StrafeLeft(SimulatorTaskAction):
         return "strafe_left"
 
     def step(self, *args, **kwargs):
-        return self._sim.step(HabitatSimActions.STRAFE_LEFT)
+        return self._sim.step(HabitatSimActions.strafe_left)
 
 
 @habitat.registry.register_task_action
@@ -141,41 +142,42 @@ class StrafeRight(SimulatorTaskAction):
         return "strafe_right"
 
     def step(self, *args, **kwargs):
-        return self._sim.step(HabitatSimActions.STRAFE_RIGHT)
+        return self._sim.step(HabitatSimActions.strafe_right)
 
 
 def main():
-    HabitatSimActions.extend_action_space("STRAFE_LEFT")
-    HabitatSimActions.extend_action_space("STRAFE_RIGHT")
+    HabitatSimActions.extend_action_space("strafe_left")
+    HabitatSimActions.extend_action_space("strafe_right")
 
     config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
-    config.defrost()
 
-    config.TASK.POSSIBLE_ACTIONS = config.TASK.POSSIBLE_ACTIONS + [
-        "STRAFE_LEFT",
-        "STRAFE_RIGHT",
-    ]
-    config.TASK.ACTIONS.STRAFE_LEFT = habitat.config.Config()
-    config.TASK.ACTIONS.STRAFE_LEFT.TYPE = "StrafeLeft"
-    config.TASK.ACTIONS.STRAFE_RIGHT = habitat.config.Config()
-    config.TASK.ACTIONS.STRAFE_RIGHT.TYPE = "StrafeRight"
-    config.SIMULATOR.ACTION_SPACE_CONFIG = "NoNoiseStrafe"
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.task.possible_actions.append("strafe_left")
+        config.task.possible_actions.append("strafe_right")
+
+        with omegaconf.open_dict(config):
+            config.task.actions.strafe_left = omegaconf.OmegaConf.create(
+                dict(type="StrafeLeft")
+            )
+            config.task.actions.strafe_right = omegaconf.OmegaConf.create(
+                dict(type="StrafeRight")
+            )
+
+        config.simulator.action_space_config = "NoNoiseStrafe"
 
     env = habitat.Env(config=config)
     env.reset()
-    env.step("STRAFE_LEFT")
-    env.step("STRAFE_RIGHT")
+    env.step("strafe_left")
+    env.step("strafe_right")
     env.close()
 
-    config.defrost()
-    config.SIMULATOR.ACTION_SPACE_CONFIG = "NoiseStrafe"
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.simulator.action_space_config = "NoiseStrafe"
 
     env = habitat.Env(config=config)
     env.reset()
-    env.step("STRAFE_LEFT")
-    env.step("STRAFE_RIGHT")
+    env.step("strafe_left")
+    env.step("strafe_right")
     env.close()
 
 

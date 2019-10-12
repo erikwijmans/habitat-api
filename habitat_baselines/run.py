@@ -51,11 +51,11 @@ def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     """
     config = get_config(exp_config, opts)
 
-    random.seed(config.TASK_CONFIG.SEED)
-    np.random.seed(config.TASK_CONFIG.SEED)
+    random.seed(config.task_CONFIG.seed)
+    np.random.seed(config.task_CONFIG.seed)
 
-    trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
-    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    trainer_init = baseline_registry.get_trainer(config.trainer_name)
+    assert trainer_init is not None, f"{config.trainer_name} is not supported"
     trainer = trainer_init(config)
 
     if run_type == "train":

@@ -16,7 +16,7 @@ r"""A minimum radius of a plane that a point should be part of to be
 considered  as a target or source location. Used to filter isolated points
 that aren't part of a floor.
 """
-ISLAND_RADIUS_LIMIT = 1.5
+ISLAND_radius_LIMIT = 1.5
 
 
 def _ratio_sample_rate(ratio: float, ratio_threshold: float) -> float:
@@ -51,7 +51,7 @@ def is_compatible_episode(
         > _ratio_sample_rate(distances_ratio, geodesic_to_euclid_ratio)
     ):
         return False, 0
-    if sim.island_radius(s) < ISLAND_RADIUS_LIMIT:
+    if sim.island_radius(s) < ISLAND_radius_LIMIT:
         return False, 0
     return True, d_separation
 
@@ -124,7 +124,7 @@ def generate_pointnav_episode(
     while episode_count < num_episodes or num_episodes < 0:
         target_position = sim.sample_navigable_point()
 
-        if sim.island_radius(target_position) < ISLAND_RADIUS_LIMIT:
+        if sim.island_radius(target_position) < ISLAND_radius_LIMIT:
             continue
 
         for retry in range(number_retries_per_target):
@@ -157,7 +157,7 @@ def generate_pointnav_episode(
 
             episode = _create_episode(
                 episode_id=episode_count,
-                scene_id=sim.config.SCENE,
+                scene_id=sim.config.scene,
                 start_position=source_position,
                 start_rotation=source_rotation,
                 target_position=target_position,

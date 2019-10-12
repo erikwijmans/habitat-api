@@ -15,7 +15,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config, logger
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.base_trainer import BaseRLTrainer
+from habitat_baselines.common.base_trainer import BaserlTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_envs
 from habitat_baselines.common.environments import get_env_class
@@ -26,12 +26,12 @@ from habitat_baselines.common.utils import (
     generate_video,
     linear_decay,
 )
-from habitat_baselines.rl.ppo import PPO, PointNavBaselinePolicy
+from habitat_baselines.rl.ppo import PointNavBaselinePolicy, ppo
 
 
 @baseline_registry.register_trainer(name="ppo")
-class PPOTrainer(BaseRLTrainer):
-    r"""Trainer class for PPO algorithm
+class ppoTrainer(BaserlTrainer):
+    r"""Trainer class for ppo algorithm
     Paper: https://arxiv.org/abs/1707.06347.
     """
     supported_tasks = ["Nav-v0"]
@@ -45,7 +45,7 @@ class PPOTrainer(BaseRLTrainer):
             logger.info(f"config: {config}")
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
-        r"""Sets up actor critic and agent for PPO.
+        r"""Sets up actor critic and agent for ppo.
 
         Args:
             ppo_cfg: config node with relevant params
@@ -53,17 +53,17 @@ class PPOTrainer(BaseRLTrainer):
         Returns:
             None
         """
-        logger.add_filehandler(self.config.LOG_FILE)
+        logger.add_filehandler(self.config.log_file)
 
         self.actor_critic = PointNavBaselinePolicy(
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
             hidden_size=ppo_cfg.hidden_size,
-            goal_sensor_uuid=self.config.TASK_CONFIG.TASK.GOAL_SENSOR_UUID,
+            goal_sensor_uuid=self.config.task_CONFIG.task.goal_sensor_uuid,
         )
         self.actor_critic.to(self.device)
 
-        self.agent = PPO(
+        self.agent = ppo(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
             ppo_epoch=ppo_cfg.ppo_epoch,
@@ -89,7 +89,7 @@ class PPOTrainer(BaseRLTrainer):
             "config": self.config,
         }
         torch.save(
-            checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
+            checkpoint, os.path.join(self.config.checkpoint_folder, file_name)
         )
 
     def load_checkpoint(self, checkpoint_path: str, *args, **kwargs) -> Dict:
@@ -196,24 +196,24 @@ class PPOTrainer(BaseRLTrainer):
         )
 
     def train(self) -> None:
-        r"""Main method for training PPO.
+        r"""Main method for training ppo.
 
         Returns:
             None
         """
 
         self.envs = construct_envs(
-            self.config, get_env_class(self.config.ENV_NAME)
+            self.config, get_env_class(self.config.env_name)
         )
 
-        ppo_cfg = self.config.RL.PPO
+        ppo_cfg = self.config.rl.ppo
         self.device = (
-            torch.device("cuda", self.config.TORCH_GPU_ID)
+            torch.device("cuda", self.config.torch_gpu_id)
             if torch.cuda.is_available()
             else torch.device("cpu")
         )
-        if not os.path.isdir(self.config.CHECKPOINT_FOLDER):
-            os.makedirs(self.config.CHECKPOINT_FOLDER)
+        if not os.path.isdir(self.config.checkpoint_folder):
+            os.makedirs(self.config.checkpoint_folder)
         self._setup_actor_critic_agent(ppo_cfg)
         logger.info(
             "agent number of parameters: {}".format(
@@ -256,19 +256,19 @@ class PPOTrainer(BaseRLTrainer):
 
         lr_scheduler = LambdaLR(
             optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: linear_decay(x, self.config.NUM_UPDATES),
+            lr_lambda=lambda x: linear_decay(x, self.config.num_updates),
         )
 
         with TensorboardWriter(
-            self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
+            self.config.tensorboard_dir, flush_secs=self.flush_secs
         ) as writer:
-            for update in range(self.config.NUM_UPDATES):
+            for update in range(self.config.num_updates):
                 if ppo_cfg.use_linear_lr_decay:
                     lr_scheduler.step()
 
                 if ppo_cfg.use_linear_clip_decay:
                     self.agent.clip_param = ppo_cfg.clip_param * linear_decay(
-                        update, self.config.NUM_UPDATES
+                        update, self.config.num_updates
                     )
 
                 for step in range(ppo_cfg.num_steps):
@@ -316,7 +316,7 @@ class PPOTrainer(BaseRLTrainer):
                 )
 
                 # log stats
-                if update > 0 and update % self.config.LOG_INTERVAL == 0:
+                if update > 0 and update % self.config.log_interval == 0:
                     logger.info(
                         "update: {}\tfps: {:.3f}\t".format(
                             update, count_steps / (time.time() - t_start)
@@ -348,7 +348,7 @@ class PPOTrainer(BaseRLTrainer):
                         logger.info("No episodes finish in current window")
 
                 # checkpoint model
-                if update % self.config.CHECKPOINT_INTERVAL == 0:
+                if update % self.config.checkpoint_interval == 0:
                     self.save_checkpoint(f"ckpt.{count_checkpoints}.pth")
                     count_checkpoints += 1
 
@@ -373,26 +373,26 @@ class PPOTrainer(BaseRLTrainer):
         # Map location CPU is almost always better than mapping to a CUDA device.
         ckpt_dict = self.load_checkpoint(checkpoint_path, map_location="cpu")
 
-        if self.config.EVAL.USE_CKPT_CONFIG:
+        if self.config.eval.use_ckpt_config:
             config = self._setup_eval_config(ckpt_dict["config"])
         else:
             config = self.config.clone()
 
-        ppo_cfg = config.RL.PPO
+        ppo_cfg = config.rl.ppo
 
         config.defrost()
-        config.TASK_CONFIG.DATASET.SPLIT = config.EVAL.SPLIT
+        config.task_CONFIG.dataset.split = config.eval.split
         config.freeze()
 
-        if len(self.config.VIDEO_OPTION) > 0:
+        if len(self.config.video_option) > 0:
             config.defrost()
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
+            config.task_CONFIG.task.measurements.append("top_down_map")
+            config.task_CONFIG.task.measurements.append("collisions")
             config.freeze()
 
         logger.info(f"env config: {config}")
         self.envs = construct_envs(
-            self.config, get_env_class(self.config.ENV_NAME)
+            self.config, get_env_class(self.config.env_name)
         )
         self._setup_actor_critic_agent(ppo_cfg)
 
@@ -400,11 +400,11 @@ class PPOTrainer(BaseRLTrainer):
         self.actor_critic = self.agent.actor_critic
 
         # get name of performance metric, e.g. "spl"
-        metric_name = self.config.TASK_CONFIG.TASK.MEASUREMENTS[0]
-        metric_cfg = getattr(self.config.TASK_CONFIG.TASK, metric_name)
-        measure_type = baseline_registry.get_measure(metric_cfg.TYPE)
+        metric_name = self.config.task_CONFIG.task.measurements[0]
+        metric_cfg = getattr(self.config.task_CONFIG.task, metric_name)
+        measure_type = baseline_registry.get_measure(metric_cfg.type)
         assert measure_type is not None, "invalid measurement type {}".format(
-            metric_cfg.TYPE
+            metric_cfg.type
         )
         self.metric_uuid = measure_type(
             sim=None, task=None, config=None
@@ -419,26 +419,26 @@ class PPOTrainer(BaseRLTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
-            self.config.NUM_PROCESSES,
+            self.config.num_processes,
             ppo_cfg.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            self.config.NUM_PROCESSES, 1, device=self.device, dtype=torch.long
+            self.config.num_processes, 1, device=self.device, dtype=torch.long
         )
         not_done_masks = torch.zeros(
-            self.config.NUM_PROCESSES, 1, device=self.device
+            self.config.num_processes, 1, device=self.device
         )
         stats_episodes = dict()  # dict of dicts that stores stats per episode
 
         rgb_frames = [
-            [] for _ in range(self.config.NUM_PROCESSES)
+            [] for _ in range(self.config.num_processes)
         ]  # type: List[List[np.ndarray]]
-        if len(self.config.VIDEO_OPTION) > 0:
-            os.makedirs(self.config.VIDEO_DIR, exist_ok=True)
+        if len(self.config.video_option) > 0:
+            os.makedirs(self.config.video_dir, exist_ok=True)
 
         while (
-            len(stats_episodes) < self.config.TEST_EPISODE_COUNT
+            len(stats_episodes) < self.config.test_episode_count
             and self.envs.num_envs > 0
         ):
             current_episodes = self.envs.current_episodes()
@@ -500,10 +500,10 @@ class PPOTrainer(BaseRLTrainer):
                         )
                     ] = episode_stats
 
-                    if len(self.config.VIDEO_OPTION) > 0:
+                    if len(self.config.video_option) > 0:
                         generate_video(
-                            video_option=self.config.VIDEO_OPTION,
-                            video_dir=self.config.VIDEO_DIR,
+                            video_option=self.config.video_option,
+                            video_dir=self.config.video_dir,
                             images=rgb_frames[i],
                             episode_id=current_episodes[i].episode_id,
                             checkpoint_idx=checkpoint_index,
@@ -515,7 +515,7 @@ class PPOTrainer(BaseRLTrainer):
                         rgb_frames[i] = []
 
                 # episode continues
-                elif len(self.config.VIDEO_OPTION) > 0:
+                elif len(self.config.video_option) > 0:
                     frame = observations_to_image(observations[i], infos[i])
                     rgb_frames[i].append(frame)
 

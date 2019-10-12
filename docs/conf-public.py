@@ -23,5 +23,5 @@ HTML_HEADER = """<!-- Global site tag (gtag.js) - Google Analytics -->
 """
 
 SEARCH_DOWNLOAD_BINARY = "searchdata-v1.bin"
-SEARCH_BASE_URL = "https://aihabitat.org/docs/habitat-api/"
-SEARCH_EXTERNAL_URL = "https://google.com/search?q=site:aihabitat.org+{query}"
+SEARCH_BASE_Url = "https://aihabitat.org/docs/habitat-api/"
+SEARCH_EXTERNAL_Url = "https://google.com/search?q=site:aihabitat.org+{query}"

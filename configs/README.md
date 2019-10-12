@@ -1,24 +1,24 @@
 Habitat-API Configuration
 ==============================
 
-Habitat-API uses [Yacs configuration system](https://github.com/rbgirshick/yacs) 
+Habitat-API uses [Yacs configuration system](https://github.com/rbgirshick/yacs)
 with the paradigm of `your code + a YACS config for experiment E (+
 external dependencies + hardware + other nuisance terms ...) =
 reproducible experiment E`. Yacs advantages:
 - Checks for type consistency.
 - All parameters and default values are searchable in the code.
-- A parameter doesn't need to be set always as each parameter has a 
+- A parameter doesn't need to be set always as each parameter has a
     default value.
 - Ability to freeze config to prevent unintended changes.
 
 ## Config usage
-An example of how to merge default config with 2 others configs and overwrite 
+An example of how to merge default config with 2 others configs and overwrite
 one parameter that could come from the command line:
 ```
     merged_config = get_config(
-        config_paths=["configs/tasks/pointnav.yaml", 
+        config_paths=["configs/tasks/pointnav.yaml",
             "configs/dataset/val.yaml"],
-        opts=["ENVIRONMENT.MAX_EPISODE_STEPS", steps_limit]
+        opts=["environment.max_episode_steps", steps_limit]
     )
 
 ```
@@ -34,16 +34,16 @@ Below is the structure of config used for Habitat:
         - Sensors
 - Dataset
 
-We use node names (e.g. `SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']`) instead of list 
-of config nodes (e.g. `SENSORS: [{TYPE = "HabitatSimDepthSensor", 
-MIN_DEPTH = 0}, ...]`) to declare the Sensors attached to an Agent or Measures 
-enabled for the Task . With this approach, it's still easy to overwrite a 
-particular sensor parameter in yaml file without redefining the whole sensor 
-config. 
+We use node names (e.g. `sensors: ['rgb_sensor', 'depth_sensor']`) instead of list
+of config nodes (e.g. `sensors: [{type = "HabitatSimDepthSensor",
+min_depth = 0}, ...]`) to declare the Sensors attached to an Agent or Measures
+enabled for the Task . With this approach, it's still easy to overwrite a
+particular sensor parameter in yaml file without redefining the whole sensor
+config.
 
 ## Extending the config
 Example of how to extend a config outside of `habtiat-api` repository.
-First, we create a config extending the default config in the code and re-use 
+First, we create a config extending the default config in the code and re-use
 `habitat.get_config()`:
 ```
 import habitat
@@ -53,10 +53,10 @@ from typing import List, Optional, Union
 _C = habitat.get_config()
 _C.defrost()
 # Add new parameters to the config
-_C.TASK.EPISODE_INFO = habitat.Config()
-_C.TASK.EPISODE_INFO.TYPE = "EpisodeInfo"
-_C.TASK.EPISODE_INFO.VALUE = 5
-_C.TASK.MEASUREMENTS.append("EPISODE_INFO")
+_C.task.episode_info = habitat.Config()
+_C.task.episode_info.type = "EpisodeInfo"
+_C.task.episode_info.VALUE = 5
+_C.task.measurements.append("episode_info")
 
 # New function returning extended Habitat config that should be used instead
 # of habitat.get_config()
@@ -100,4 +100,4 @@ def main():
     config = my_get_config(config_paths=args.task_config, opts=args.opts)
     env = habitat.Env(config)
 
-``` 
+```

@@ -32,13 +32,13 @@ def get_env_class(env_name: str) -> Type[habitat.RLEnv]:
 @baseline_registry.register_env(name="NavRLEnv")
 class NavRLEnv(habitat.RLEnv):
     def __init__(self, config: Config, dataset: Optional[Dataset] = None):
-        self._rl_config = config.RL
-        self._core_env_config = config.TASK_CONFIG
+        self._rl_config = config.rl
+        self._core_env_config = config.task_CONFIG
 
         self._previous_target_distance = None
         self._previous_action = None
         self._episode_distance_covered = None
-        self._success_distance = self._core_env_config.TASK.SUCCESS_DISTANCE
+        self._success_distance = self._core_env_config.task.success_distance
         super().__init__(self._core_env_config, dataset)
 
     def reset(self):
@@ -57,19 +57,19 @@ class NavRLEnv(habitat.RLEnv):
 
     def get_reward_range(self):
         return (
-            self._rl_config.SLACK_REWARD - 1.0,
-            self._rl_config.SUCCESS_REWARD + 1.0,
+            self._rl_config.slack_reward - 1.0,
+            self._rl_config.success_reward + 1.0,
         )
 
     def get_reward(self, observations):
-        reward = self._rl_config.SLACK_REWARD
+        reward = self._rl_config.slack_reward
 
         current_target_distance = self._distance_target()
         reward += self._previous_target_distance - current_target_distance
         self._previous_target_distance = current_target_distance
 
         if self._episode_success():
-            reward += self._rl_config.SUCCESS_REWARD
+            reward += self._rl_config.success_reward
 
         return reward
 

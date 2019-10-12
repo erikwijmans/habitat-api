@@ -7,6 +7,7 @@
 import os
 
 import numpy as np
+import omegaconf
 import pytest
 
 import habitat
@@ -19,15 +20,14 @@ TELEPORT_ROTATION = [0.92035, 0, -0.39109465, 0]
 
 def test_task_actions():
     config = habitat.get_config(config_paths=CFG_TEST)
-    config.defrost()
-    config.TASK.POSSIBLE_ACTIONS = config.TASK.POSSIBLE_ACTIONS + ["TELEPORT"]
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.task.possible_actions.append("teleport")
 
     env = habitat.Env(config=config)
     env.reset()
     env.step(
         action={
-            "action": "TELEPORT",
+            "action": "teleport",
             "action_args": {
                 "position": TELEPORT_POSITION,
                 "rotation": TELEPORT_ROTATION,
@@ -42,15 +42,15 @@ def test_task_actions():
         np.array(TELEPORT_ROTATION, dtype=np.float32),
         np.array([*agent_state.rotation.imag, agent_state.rotation.real]),
     ), "mismatch in rotation after teleport"
-    env.step("TURN_RIGHT")
+    env.step("turn_right")
     env.close()
 
 
 def test_task_actions_sampling_for_teleport():
     config = habitat.get_config(config_paths=CFG_TEST)
-    config.defrost()
-    config.TASK.POSSIBLE_ACTIONS = config.TASK.POSSIBLE_ACTIONS + ["TELEPORT"]
-    config.freeze()
+
+    with omegaconf.read_write(config):
+        config.task.possible_actions.append("teleport")
 
     env = habitat.Env(config=config)
     env.reset()
@@ -78,11 +78,11 @@ def test_task_actions_sampling_for_teleport():
 def test_task_actions_sampling(config_file):
     config = habitat.get_config(config_paths=config_file)
     if not os.path.exists(
-        config.DATASET.DATA_PATH.format(split=config.DATASET.SPLIT)
+        config.dataset.data_path.format(split=config.dataset.split)
     ):
         pytest.skip(
             f"Please download dataset to data folder "
-            f"{config.DATASET.DATA_PATH}."
+            f"{config.dataset.data_path}."
         )
 
     env = habitat.Env(config=config)

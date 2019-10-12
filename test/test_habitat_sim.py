@@ -17,9 +17,9 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 
 def init_sim():
     config = get_config()
-    if not os.path.exists(config.SIMULATOR.SCENE):
+    if not os.path.exists(config.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
-    return make_sim(config.SIMULATOR.TYPE, config=config.SIMULATOR)
+    return make_sim(config.simulator.type, config=config.simulator)
 
 
 def test_sim_trajectory():
@@ -75,10 +75,12 @@ def test_sim_trajectory():
 
 def test_sim_no_sensors():
     config = get_config()
-    config.defrost()
-    config.SIMULATOR.AGENT_0.SENSORS = []
-    if not os.path.exists(config.SIMULATOR.SCENE):
+
+    with omegaconf.read_write(config):
+        config.simulator.agent_0.sensors = []
+
+    if not os.path.exists(config.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
-    sim = make_sim(config.SIMULATOR.TYPE, config=config.SIMULATOR)
+    sim = make_sim(config.simulator.type, config=config.simulator)
     sim.reset()
     sim.close()

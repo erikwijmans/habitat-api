@@ -22,9 +22,9 @@ except ImportError:
 def test_demo_notebook():
     config = habitat.get_config("configs/tasks/pointnav_rgbd.yaml")
     config.defrost()
-    config.DATASET.SPLIT = "val"
+    config.dataset.split = "val"
 
-    if not PointNavDatasetV1.check_config_paths_exist(config.DATASET):
+    if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
         pytest.skip("Please download the habitat test scenes")
     else:
         pytest.main(

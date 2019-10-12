@@ -9,9 +9,9 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import gym
 import numpy as np
+import omegaconf
 from gym.spaces.dict_space import Dict as SpaceDict
 
-from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode, EpisodeIterator
 from habitat.core.embodied_task import EmbodiedTask, Metrics
 from habitat.core.simulator import Observations, Simulator
@@ -35,7 +35,7 @@ class Env:
 
     observation_space: SpaceDict
     action_space: SpaceDict
-    _config: Config
+    _config: omegaconf.OmegaConf
     _dataset: Optional[Dataset]
     _episodes: List[Type[Episode]]
     _current_episode_index: Optional[int]
@@ -50,7 +50,7 @@ class Env:
     _episode_over: bool
 
     def __init__(
-        self, config: Config, dataset: Optional[Dataset] = None
+        self, config: omegaconf.OmegaConf, dataset: Optional[Dataset] = None
     ) -> None:
         """Constructor
 
@@ -62,22 +62,18 @@ class Env:
             ``_episodes`` should be populated from outside.
         """
 
-        assert config.is_frozen(), (
-            "Freeze the config before creating the "
-            "environment, use config.freeze()."
-        )
         self._config = config
         self._dataset = dataset
         self._current_episode_index = None
-        if self._dataset is None and config.DATASET.TYPE:
+        if self._dataset is None and config.dataset.type:
             self._dataset = make_dataset(
-                id_dataset=config.DATASET.TYPE, config=config.DATASET
+                id_dataset=config.dataset.type, config=config.dataset
             )
         self._episodes = self._dataset.episodes if self._dataset else []
         self._current_episode = None
         iter_option_dict = {
             k.lower(): v
-            for k, v in config.ENVIRONMENT.ITERATOR_OPTIONS.items()
+            for k, v in config.environment.iterator_options.items()
         }
         self._episode_iterator = self._dataset.get_episode_iterator(
             **iter_option_dict
@@ -88,16 +84,17 @@ class Env:
             assert (
                 len(self._dataset.episodes) > 0
             ), "dataset should have non-empty episodes list"
-            self._config.defrost()
-            self._config.SIMULATOR.SCENE = self._dataset.episodes[0].scene_id
-            self._config.freeze()
+            with omegaconf.read_write(self._config):
+                self._config.simulator.scene = self._dataset.episodes[
+                    0
+                ].scene_id
 
         self._sim = make_sim(
-            id_sim=self._config.SIMULATOR.TYPE, config=self._config.SIMULATOR
+            id_sim=self._config.simulator.type, config=self._config.simulator
         )
         self._task = make_task(
-            self._config.TASK.TYPE,
-            config=self._config.TASK,
+            self._config.task.type,
+            config=self._config.task,
             sim=self._sim,
             dataset=self._dataset,
         )
@@ -109,9 +106,9 @@ class Env:
         )
         self.action_space = self._task.action_space
         self._max_episode_seconds = (
-            self._config.ENVIRONMENT.MAX_EPISODE_SECONDS
+            self._config.environment.max_episode_seconds
         )
-        self._max_episode_steps = self._config.ENVIRONMENT.MAX_EPISODE_STEPS
+        self._max_episode_steps = self._config.environment.max_episode_steps
         self._elapsed_steps = 0
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
@@ -257,16 +254,15 @@ class Env:
         self._sim.seed(seed)
         self._task.seed(seed)
 
-    def reconfigure(self, config: Config) -> None:
+    def reconfigure(self, config: omegaconf.OmegaConf) -> None:
         self._config = config
 
-        self._config.defrost()
-        self._config.SIMULATOR = self._task.overwrite_sim_config(
-            self._config.SIMULATOR, self.current_episode
-        )
-        self._config.freeze()
+        with omegaconf.read_write(self._config):
+            self._task.overwrite_sim_config(
+                self._config.simulator, self.current_episode
+            )
 
-        self._sim.reconfigure(self._config.SIMULATOR)
+        self._sim.reconfigure(self._config.simulator)
 
     def render(self, mode="rgb") -> np.ndarray:
         return self._sim.render(mode)
@@ -278,7 +274,7 @@ class Env:
 class RLEnv(gym.Env):
     r"""Reinforcement Learning (RL) environment class which subclasses ``gym.Env``.
 
-    This is a wrapper over `Env` for RL users. To create custom RL
+    This is a wrapper over `Env` for rl users. To create custom rl
     environments users should subclass `RLEnv` and define the following
     methods: `get_reward_range()`, `get_reward()`, `get_done()`, `get_info()`.
 
@@ -289,7 +285,7 @@ class RLEnv(gym.Env):
     _env: Env
 
     def __init__(
-        self, config: Config, dataset: Optional[Dataset] = None
+        self, config: omegaconf.OmegaConf, dataset: Optional[Dataset] = None
     ) -> None:
         """Constructor
 

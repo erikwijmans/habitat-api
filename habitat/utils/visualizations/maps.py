@@ -37,16 +37,16 @@ MAP_BORDER_INDICATOR = 2
 MAP_SOURCE_POINT_INDICATOR = 4
 MAP_TARGET_POINT_INDICATOR = 6
 MAP_SHORTEST_PATH_COLOR = 7
-TOP_DOWN_MAP_COLORS = np.full((256, 3), 150, dtype=np.uint8)
-TOP_DOWN_MAP_COLORS[10:] = cv2.applyColorMap(
+top_down_map_COLORS = np.full((256, 3), 150, dtype=np.uint8)
+top_down_map_COLORS[10:] = cv2.applyColorMap(
     np.arange(246, dtype=np.uint8), cv2.COLORMAP_JET
 ).squeeze(1)[:, ::-1]
-TOP_DOWN_MAP_COLORS[MAP_INVALID_POINT] = [255, 255, 255]
-TOP_DOWN_MAP_COLORS[MAP_VALID_POINT] = [150, 150, 150]
-TOP_DOWN_MAP_COLORS[MAP_BORDER_INDICATOR] = [50, 50, 50]
-TOP_DOWN_MAP_COLORS[MAP_SOURCE_POINT_INDICATOR] = [0, 0, 200]
-TOP_DOWN_MAP_COLORS[MAP_TARGET_POINT_INDICATOR] = [200, 0, 0]
-TOP_DOWN_MAP_COLORS[MAP_SHORTEST_PATH_COLOR] = [0, 200, 0]
+top_down_map_COLORS[MAP_INVALID_POINT] = [255, 255, 255]
+top_down_map_COLORS[MAP_VALID_POINT] = [150, 150, 150]
+top_down_map_COLORS[MAP_BORDER_INDICATOR] = [50, 50, 50]
+top_down_map_COLORS[MAP_SOURCE_POINT_INDICATOR] = [0, 0, 200]
+top_down_map_COLORS[MAP_TARGET_POINT_INDICATOR] = [200, 0, 0]
+top_down_map_COLORS[MAP_SHORTEST_PATH_COLOR] = [0, 200, 0]
 
 
 def draw_agent(
@@ -347,7 +347,7 @@ def colorize_topdown_map(
         Returns:
             A colored version of the top-down map.
     """
-    _map = TOP_DOWN_MAP_COLORS[top_down_map]
+    _map = top_down_map_COLORS[top_down_map]
 
     if fog_of_war_mask is not None:
         fog_of_war_desat_values = np.array([[fog_of_war_desat_amount], [1.0]])
@@ -370,7 +370,7 @@ def draw_path(
     r"""Draw path on top_down_map (in place) with specified color.
         Args:
             top_down_map: A colored version of the map.
-            color: color code of the path, from TOP_DOWN_MAP_COLORS.
+            color: color code of the path, from top_down_map_COLORS.
             path_points: list of points that specify the path to be drawn
             thickness: thickness of the path.
     """

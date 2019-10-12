@@ -96,4 +96,7 @@ def get_config(
             cfg, omegaconf.OmegaConf.from_dotlist(ops)
         )
 
+    omegaconf.OmegaConf.set_readonly(cfg, True)
+    omegaconf.OmegaConf.set_struct(cfg, True)
+
     return cfg

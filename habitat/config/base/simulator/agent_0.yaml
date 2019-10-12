@@ -10,7 +10,7 @@ simulator:
     mass: 32.0
     radius: 0.1
     sensors:
-    - RGB_SENSOR
+    - rgb_sensor
     start_position:
     - 0
     - 0

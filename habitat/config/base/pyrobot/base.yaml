@@ -5,6 +5,6 @@ pyrobot:
   robots:
   - locobot
   sensors:
-  - RGB_SENSOR
-  - DEPTH_SENSOR
-  - BUMP_SENSOR
+  - rgb_sensor
+  - depth_sensor
+  - bump_sensor

@@ -79,16 +79,16 @@ you can install using: :sh:`pip install opencv-python`.
             keystroke = cv2.waitKey(0)
 
             if keystroke == ord(FORWARD_KEY):
-                action = HabitatSimActions.MOVE_FORWARD
+                action = HabitatSimActions.move_forward
                 print("action: FORWARD")
             elif keystroke == ord(LEFT_KEY):
-                action = HabitatSimActions.TURN_LEFT
+                action = HabitatSimActions.turn_left
                 print("action: LEFT")
             elif keystroke == ord(RIGHT_KEY):
-                action = HabitatSimActions.TURN_RIGHT
+                action = HabitatSimActions.turn_right
                 print("action: RIGHT")
             elif keystroke == ord(FINISH):
-                action = HabitatSimActions.STOP
+                action = HabitatSimActions.stop
                 print("action: FINISH")
             else:
                 print("INVALID KEY")
@@ -103,7 +103,7 @@ you can install using: :sh:`pip install opencv-python`.
 
         print("Episode finished after {} steps.".format(count_steps))
 
-        if action == HabitatSimActions.STOP and observations["pointgoal"][0] < 0.2:
+        if action == HabitatSimActions.stop and observations["pointgoal"][0] < 0.2:
             print("you successfully navigated to destination point")
         else:
             print("your navigation was unsuccessful")
@@ -117,7 +117,7 @@ move around in the environment using :label-default:`W`, :label-default:`A`,
 :label-default:`D`, :label-default:`F` keys. On the terminal a destination
 vector in polar format will be printed with distance to goal and angle to goal.
 Once you are withing 0.2m of goal you can press the :label-default:`F` key to
-``STOP`` and finish the episode successfully. If your finishing distance to
+``stop`` and finish the episode successfully. If your finishing distance to
 goal is :math:`> 0.2m` or if you spend more than 500 steps in the environment
 your episode will be unsuccessful.
 

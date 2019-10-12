@@ -1,2 +1,2 @@
-DATASET:
-  NUM_EPISODE_SAMPLE: 1
+dataset:
+  num_episode_sample: 1

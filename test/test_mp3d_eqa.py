@@ -88,7 +88,7 @@ def check_json_serializaiton(dataset: habitat.Dataset):
 
 
 def test_mp3d_eqa_dataset():
-    dataset_config = get_config(CFG_TEST).DATASET
+    dataset_config = get_config(CFG_TEST).dataset
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
         dataset_config
     ):
@@ -108,14 +108,14 @@ def test_mp3d_eqa_sim():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.DATASET
+        eqa_config.dataset
     ):
         pytest.skip(
             "Please download Matterport3D EQA dataset to " "data folder."
         )
 
     dataset = make_dataset(
-        id_dataset=eqa_config.DATASET.TYPE, config=eqa_config.DATASET
+        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
     )
     env = habitat.Env(config=eqa_config, dataset=dataset)
     env.episodes = dataset.episodes[:EPISODES_LIMIT]
@@ -127,14 +127,14 @@ def test_mp3d_eqa_sim():
         if not env.episode_over:
             assert "rgb" in obs, "RGB image is missing in observation."
             assert obs["rgb"].shape[:2] == (
-                eqa_config.SIMULATOR.RGB_SENSOR.HEIGHT,
-                eqa_config.SIMULATOR.RGB_SENSOR.WIDTH,
+                eqa_config.simulator.rgb_sensor.height,
+                eqa_config.simulator.rgb_sensor.width,
             ), (
                 "Observation resolution {} doesn't correspond to config "
                 "({}, {}).".format(
                     obs["rgb"].shape[:2],
-                    eqa_config.SIMULATOR.RGB_SENSOR.HEIGHT,
-                    eqa_config.SIMULATOR.RGB_SENSOR.WIDTH,
+                    eqa_config.simulator.rgb_sensor.height,
+                    eqa_config.simulator.rgb_sensor.width,
                 )
             )
 
@@ -145,14 +145,14 @@ def test_mp3d_eqa_sim_correspondence():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.DATASET
+        eqa_config.dataset
     ):
         pytest.skip(
             "Please download Matterport3D EQA dataset to " "data folder."
         )
 
     dataset = make_dataset(
-        id_dataset=eqa_config.DATASET.TYPE, config=eqa_config.DATASET
+        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
     )
     env = habitat.Env(config=eqa_config, dataset=dataset)
     env.episodes = [
@@ -235,12 +235,12 @@ def test_eqa_task():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.DATASET
+        eqa_config.dataset
     ):
         pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
-        id_dataset=eqa_config.DATASET.TYPE, config=eqa_config.DATASET
+        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
     )
     env = habitat.Env(config=eqa_config, dataset=dataset)
     env.episodes = list(

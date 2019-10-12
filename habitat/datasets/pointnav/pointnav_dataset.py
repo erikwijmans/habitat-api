@@ -34,8 +34,8 @@ class PointNavDatasetV1(Dataset):
     @staticmethod
     def check_config_paths_exist(config: Config) -> bool:
         return os.path.exists(
-            config.DATA_PATH.format(split=config.SPLIT)
-        ) and os.path.exists(config.SCENES_DIR)
+            config.data_path.format(split=config.split)
+        ) and os.path.exists(config.sceneS_DIR)
 
     @staticmethod
     def get_scenes_to_load(config: Config) -> List[str]:
@@ -44,12 +44,12 @@ class PointNavDatasetV1(Dataset):
         """
         assert PointNavDatasetV1.check_config_paths_exist(config)
         dataset_dir = os.path.dirname(
-            config.DATA_PATH.format(split=config.SPLIT)
+            config.data_path.format(split=config.split)
         )
 
         cfg = config.clone()
         cfg.defrost()
-        cfg.CONTENT_SCENES = []
+        cfg.CONTENT_sceneS = []
         dataset = PointNavDatasetV1(cfg)
         return PointNavDatasetV1._get_scenes_from_folder(
             content_scenes_path=dataset.content_scenes_path,
@@ -78,13 +78,13 @@ class PointNavDatasetV1(Dataset):
         if config is None:
             return
 
-        datasetfile_path = config.DATA_PATH.format(split=config.SPLIT)
+        datasetfile_path = config.data_path.format(split=config.split)
         with gzip.open(datasetfile_path, "rt") as f:
-            self.from_json(f.read(), scenes_dir=config.SCENES_DIR)
+            self.from_json(f.read(), scenes_dir=config.scenes_dir)
 
         # Read separate file for each scene
         dataset_dir = os.path.dirname(datasetfile_path)
-        scenes = config.CONTENT_SCENES
+        scenes = config.content_scenes
         if ALL_SCENES_MASK in scenes:
             scenes = PointNavDatasetV1._get_scenes_from_folder(
                 content_scenes_path=self.content_scenes_path,
@@ -96,7 +96,7 @@ class PointNavDatasetV1(Dataset):
                 data_path=dataset_dir, scene=scene
             )
             with gzip.open(scene_filename, "rt") as f:
-                self.from_json(f.read(), scenes_dir=config.SCENES_DIR)
+                self.from_json(f.read(), scenes_dir=config.sceneS_DIR)
 
     def from_json(
         self, json_str: str, scenes_dir: Optional[str] = None

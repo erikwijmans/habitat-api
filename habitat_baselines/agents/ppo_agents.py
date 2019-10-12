@@ -22,19 +22,19 @@ from habitat_baselines.rl.ppo import PointNavBaselinePolicy
 
 def get_default_config():
     c = Config()
-    c.INPUT_TYPE = "blind"
+    c.INPUT_type = "blind"
     c.MODEL_PATH = "data/checkpoints/blind.pth"
     c.RESOLUTION = 256
     c.HIDDEN_SIZE = 512
-    c.RANDOM_SEED = 7
+    c.RANDOM_seed = 7
     c.PTH_GPU_ID = 0
-    c.GOAL_SENSOR_UUID = "pointgoal_with_gps_compass"
+    c.goal_sensor_uuid = "pointgoal_with_gps_compass"
     return c
 
 
-class PPOAgent(Agent):
+class ppoAgent(Agent):
     def __init__(self, config: Config):
-        self.goal_sensor_uuid = config.GOAL_SENSOR_UUID
+        self.goal_sensor_uuid = config.goal_sensor_uuid
         spaces = {
             self.goal_sensor_uuid: Box(
                 low=np.finfo(np.float32).min,
@@ -44,7 +44,7 @@ class PPOAgent(Agent):
             )
         }
 
-        if config.INPUT_TYPE in ["depth", "rgbd"]:
+        if config.INPUT_type in ["depth", "rgbd"]:
             spaces["depth"] = Box(
                 low=0,
                 high=1,
@@ -52,7 +52,7 @@ class PPOAgent(Agent):
                 dtype=np.float32,
             )
 
-        if config.INPUT_TYPE in ["rgb", "rgbd"]:
+        if config.INPUT_type in ["rgb", "rgbd"]:
             spaces["rgb"] = Box(
                 low=0,
                 high=255,
@@ -70,8 +70,8 @@ class PPOAgent(Agent):
         )
         self.hidden_size = config.HIDDEN_SIZE
 
-        random.seed(config.RANDOM_SEED)
-        torch.random.manual_seed(config.RANDOM_SEED)
+        random.seed(config.RANDOM_seed)
+        torch.random.manual_seed(config.RANDOM_seed)
         if torch.cuda.is_available():
             torch.backends.cudnn.deterministic = True
 
@@ -151,11 +151,11 @@ def main():
     config = get_config(args.task_config)
 
     agent_config = get_default_config()
-    agent_config.INPUT_TYPE = args.input_type
+    agent_config.INPUT_type = args.input_type
     agent_config.MODEL_PATH = args.model_path
-    agent_config.GOAL_SENSOR_UUID = config.TASK.GOAL_SENSOR_UUID
+    agent_config.goal_sensor_uuid = config.task.goal_sensor_uuid
 
-    agent = PPOAgent(agent_config)
+    agent = ppoAgent(agent_config)
     benchmark = habitat.Benchmark(config_paths=args.task_config)
     metrics = benchmark.evaluate(agent)
 

@@ -254,7 +254,7 @@ class EpisodeIterator(Iterator):
     higher performance. More context: simulator suffers overhead when switching
     between scenes, therefore episodes of the same scene should be loaded
     consecutively. However, if too many consecutive episodes from same scene
-    are feed into RL model, the model will risk to overfit that scene.
+    are feed into rl model, the model will risk to overfit that scene.
     Therefore it's better to load same scene consecutively and switch once a
     number threshold is reached.
 

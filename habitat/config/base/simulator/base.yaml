@@ -1,7 +1,7 @@
 simulator:
   action_space_config: v0
   agents:
-  - AGENT_0
+  - agent_0
   default_agent_id: 0
   forward_step_size: 0.25
   scene: data/scene_datasets/habitat-test-scenes/van-gogh-room.glb

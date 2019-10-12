@@ -1,5 +1,5 @@
 task:
   pointgoal_with_gps_compass_sensor:
     dimensionality: 2
-    goal_format: POLAR
+    goal_format: polar
     type: PointGoalWithGPSCompassSensor

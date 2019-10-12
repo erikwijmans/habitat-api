@@ -16,6 +16,7 @@ Habitat API Demo
 
     import numpy as np
     import random
+    import omegaconf
 
     %matplotlib inline
     import matplotlib.pyplot as plt
@@ -24,18 +25,17 @@ All the boilerplate code in the habitat-sim to set sensor config and agent
 config is abstracted out in the Habitat-API config system. Default config is at
 :gh:`habitat/config/default.py <facebookresearch/habitat-api/blob/master/habitat/config/default.py>`.
 You can override defaults by specifying them in a separate file and pass it to
-the `habitat.config.get_config()` function or defrost the config object,
-override parameters and freeze the config.
+the `habitat.config.get_config()` function or by making the config object writable and
+overriding parameters.
 
 .. code-figure::
 
     .. code:: py
 
         config = habitat.get_config(config_paths='../configs/tasks/pointnav_mp3d.yaml')
-        config.defrost()
-        config.DATASET.DATA_PATH = '../data/datasets/pointnav/mp3d/v1/val/val.json.gz'
-        config.DATASET.SCENES_DIR = '../data/scene_datasets/'
-        config.freeze()
+        with omegaconf.read_write(config):
+            config.dataset.data_path = '../data/datasets/pointnav/mp3d/v1/val/val.json.gz'
+            config.dataset.scenes_dir = '../data/scene_datasets/'
 
         env = habitat.Env(config=config)
 
@@ -135,14 +135,13 @@ override parameters and freeze the config.
         plt.show()
 
     config = habitat.get_config(config_paths='../configs/tasks/pointnav_mp3d.yaml')
-    config.defrost()
-    config.DATASET.DATA_PATH = '../data/datasets/pointnav/mp3d/v1/val/val.json.gz'
-    config.DATASET.SCENES_DIR = '../data/scene_datasets/'
-    config.SIMULATOR.AGENT_0.SENSORS = ['RGB_SENSOR', 'DEPTH_SENSOR', 'SEMANTIC_SENSOR']
-    config.SIMULATOR.SEMANTIC_SENSOR.WIDTH = 256
-    config.SIMULATOR.SEMANTIC_SENSOR.HEIGHT = 256
-    config.SIMULATOR.TURN_ANGLE = 30
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.dataset.data_path = '../data/datasets/pointnav/mp3d/v1/val/val.json.gz'
+        config.dataset.scenes_dir = '../data/scene_datasets/'
+        config.simulator.agent_0.sensors = ['rgb_sensor', 'depth_sensor', 'semantic_sensor']
+        config.simulator.semantic_sensor.width = 256
+        config.simulator.semantic_sensor.height = 256
+        config.simulator.turn_angle = 30
 
     env = habitat.Env(config=config)
     env.episodes = random.sample(env.episodes, 2)

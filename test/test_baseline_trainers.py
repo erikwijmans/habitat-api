@@ -14,7 +14,7 @@ try:
     import torch
 
     from habitat_baselines.run import run_exp
-    from habitat_baselines.common.base_trainer import BaseRLTrainer
+    from habitat_baselines.common.base_trainer import BaserlTrainer
     from habitat_baselines.config.default import get_config
 
     baseline_installed = True
@@ -46,7 +46,7 @@ def test_trainers(test_cfg_path, mode, gpu2gpu):
     run_exp(
         test_cfg_path,
         mode,
-        ["TASK_CONFIG.SIMULATOR.HABITAT_SIM_V0.GPU_GPU", str(gpu2gpu)],
+        ["task_CONFIG.simulator.habitat_sim_v0.gpu_gpu", str(gpu2gpu)],
     )
 
 
@@ -54,25 +54,25 @@ def test_trainers(test_cfg_path, mode, gpu2gpu):
     not baseline_installed, reason="baseline sub-module not installed"
 )
 def test_eval_config():
-    ckpt_opts = ["VIDEO_OPTION", "[]"]
-    eval_opts = ["VIDEO_OPTION", "['disk']"]
+    ckpt_opts = ["video_option", "[]"]
+    eval_opts = ["video_option", "['disk']"]
 
     ckpt_cfg = get_config(None, ckpt_opts)
-    assert ckpt_cfg.VIDEO_OPTION == []
-    assert ckpt_cfg.CMD_TRAILING_OPTS == ["VIDEO_OPTION", "[]"]
+    assert ckpt_cfg.video_option == []
+    assert ckpt_cfg.cmd_trailing_opts == ["video_option", "[]"]
 
     eval_cfg = get_config(None, eval_opts)
-    assert eval_cfg.VIDEO_OPTION == ["disk"]
-    assert eval_cfg.CMD_TRAILING_OPTS == ["VIDEO_OPTION", "['disk']"]
+    assert eval_cfg.video_option == ["disk"]
+    assert eval_cfg.cmd_trailing_opts == ["video_option", "['disk']"]
 
-    trainer = BaseRLTrainer(get_config())
-    assert trainer.config.VIDEO_OPTION == ["disk", "tensorboard"]
+    trainer = BaserlTrainer(get_config())
+    assert trainer.config.video_option == ["disk", "tensorboard"]
     returned_config = trainer._setup_eval_config(checkpoint_config=ckpt_cfg)
-    assert returned_config.VIDEO_OPTION == []
+    assert returned_config.video_option == []
 
-    trainer = BaseRLTrainer(eval_cfg)
+    trainer = BaserlTrainer(eval_cfg)
     returned_config = trainer._setup_eval_config(ckpt_cfg)
-    assert returned_config.VIDEO_OPTION == ["disk"]
+    assert returned_config.video_option == ["disk"]
 
 
 def __do_pause_test(num_envs, envs_to_pause):
@@ -110,7 +110,7 @@ def __do_pause_test(num_envs, envs_to_pause):
         prev_actions,
         batch,
         rgb_frames,
-    ) = BaseRLTrainer._pause_envs(
+    ) = BaserlTrainer._pause_envs(
         envs_to_pause,
         envs,
         test_recurrent_hidden_states,

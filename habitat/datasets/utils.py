@@ -13,7 +13,7 @@ from habitat.core.simulator import ShortestPathPoint
 from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
 from habitat.utils.geometry_utils import quaternion_to_list
 
-SENTENCE_SPLIT_REGEX = re.compile(r"([^\w-]+)")
+SENTENCE_split_REGEX = re.compile(r"([^\w-]+)")
 
 """
  Tokenize and vocabulary utils originally authored by @apsdehal and are
@@ -22,7 +22,7 @@ SENTENCE_SPLIT_REGEX = re.compile(r"([^\w-]+)")
 
 
 def tokenize(
-    sentence, regex=SENTENCE_SPLIT_REGEX, keep=["'s"], remove=[",", "?"]
+    sentence, regex=SENTENCE_split_REGEX, keep=["'s"], remove=[",", "?"]
 ):
     sentence = sentence.lower()
 
@@ -113,7 +113,7 @@ class VocabDict:
     def tokenize_and_index(
         self,
         sentence,
-        regex=SENTENCE_SPLIT_REGEX,
+        regex=SENTENCE_split_REGEX,
         keep=["'s"],
         remove=[",", "?"],
     ) -> List[int]:
@@ -136,7 +136,7 @@ class VocabFromText(VocabDict):
         self,
         sentences,
         min_count=1,
-        regex=SENTENCE_SPLIT_REGEX,
+        regex=SENTENCE_split_REGEX,
         keep=[],
         remove=[],
         only_unk_extra=False,

@@ -27,7 +27,7 @@ def make_env_fn(
         env object created according to specification.
     """
     dataset = make_dataset(
-        config.TASK_CONFIG.DATASET.TYPE, config=config.TASK_CONFIG.DATASET
+        config.task_CONFIG.dataset.type, config=config.task_CONFIG.dataset
     )
     env = env_class(config=config, dataset=dataset)
     env.seed(rank)
@@ -50,11 +50,11 @@ def construct_envs(
         VectorEnv object created according to specification.
     """
 
-    num_processes = config.NUM_PROCESSES
+    num_processes = config.num_processes
     configs = []
     env_classes = [env_class for _ in range(num_processes)]
-    dataset = make_dataset(config.TASK_CONFIG.DATASET.TYPE)
-    scenes = dataset.get_scenes_to_load(config.TASK_CONFIG.DATASET)
+    dataset = make_dataset(config.task_CONFIG.dataset.type)
+    scenes = dataset.get_scenes_to_load(config.task_CONFIG.dataset)
 
     if len(scenes) > 0:
         random.shuffle(scenes)
@@ -72,20 +72,20 @@ def construct_envs(
 
     for i in range(num_processes):
 
-        task_config = config.TASK_CONFIG.clone()
+        task_config = config.task_CONFIG.clone()
         task_config.defrost()
         if len(scenes) > 0:
-            task_config.DATASET.CONTENT_SCENES = scene_splits[i]
+            task_config.dataset.CONTENT_sceneS = scene_splits[i]
 
-        task_config.SIMULATOR.HABITAT_SIM_V0.GPU_DEVICE_ID = (
-            config.SIMULATOR_GPU_ID
+        task_config.simulator.habitat_sim_v0.gpu_device_id = (
+            config.simulator_GPU_ID
         )
 
-        task_config.SIMULATOR.AGENT_0.SENSORS = config.SENSORS
+        task_config.simulator.agent_0.sensors = config.sensors
         task_config.freeze()
 
         config.defrost()
-        config.TASK_CONFIG = task_config
+        config.task_CONFIG = task_config
         config.freeze()
         configs.append(config.clone())
 

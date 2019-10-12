@@ -9,8 +9,8 @@ log_interval: 10
 num_processes: 16
 num_updates: 10000
 sensors:
-- RGB_SENSOR
-- DEPTH_SENSOR
+- rgb_sensor
+- depth_sensor
 simulator_gpu_id: 0
 tensorboard_dir: tb
 test_episode_count: 2
