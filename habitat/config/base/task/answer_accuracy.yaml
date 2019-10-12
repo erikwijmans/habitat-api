@@ -1,0 +1,3 @@
+task:
+  answer_accuracy:
+    type: AnswerAccuracy

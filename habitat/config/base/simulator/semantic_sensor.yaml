@@ -1,0 +1,10 @@
+simulator:
+  semantic_sensor:
+    height: 480
+    hfov: 90
+    position:
+    - 0
+    - 1.25
+    - 0
+    type: HabitatSimSemanticSensor
+    width: 640

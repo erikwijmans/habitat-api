@@ -1,0 +1,4 @@
+simulator:
+  habitat_sim_v0:
+    gpu_device_id: 0
+    gpu_gpu: false

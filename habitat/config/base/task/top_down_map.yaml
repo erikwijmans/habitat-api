@@ -1,0 +1,14 @@
+task:
+  top_down_map:
+    draw_border: true
+    draw_shortest_path: true
+    draw_source_and_target: true
+    fog_of_war:
+      draw: true
+      fov: 90
+      visibility_dist: 5.0
+    map_padding: 3
+    map_resolution: 1250
+    max_episode_steps: 1000
+    num_topdown_map_sample_points: 20000
+    type: TopDownMap

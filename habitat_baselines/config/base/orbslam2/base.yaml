@@ -1,0 +1,20 @@
+orbslam2:
+  angle_th: 0.2617993877991494
+  beta: 100
+  camera_height: 1.25
+  d_obstacle_max: 4.0
+  d_obstacle_min: 0.1
+  depth_denorm: 10
+  dist_reached_th: 0.15
+  dist_to_stop: 0.05
+  h_obstacle_max: 1.25
+  h_obstacle_min: 0.375
+  map_cell_size: 0.1
+  map_size: 40
+  min_pts_in_obstacle: 320.0
+  next_waypoint_th: 0.5
+  num_actions: 3
+  planner_max_steps: 500
+  preprocess_map: true
+  slam_settings_path: habitat_baselines/slambased/data/mp3d3_small1k.yaml
+  slam_vocab_path: habitat_baselines/slambased/data/ORBvoc.txt

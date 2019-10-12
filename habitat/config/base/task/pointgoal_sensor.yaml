@@ -1,0 +1,5 @@
+task:
+  pointgoal_sensor:
+    dimensionality: 2
+    goal_format: POLAR
+    type: PointGoalSensor

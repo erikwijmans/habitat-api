@@ -1,0 +1,3 @@
+task:
+  heading_sensor:
+    type: HeadingSensor

@@ -1,0 +1,10 @@
+pyrobot:
+  base_controller: proportional
+  base_planner: none
+  robot: locobot
+  robots:
+  - locobot
+  sensors:
+  - RGB_SENSOR
+  - DEPTH_SENSOR
+  - BUMP_SENSOR
