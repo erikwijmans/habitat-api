@@ -7,6 +7,7 @@
 from typing import Any
 
 import numpy as np
+import omegaconf
 from gym import spaces
 
 import habitat
@@ -31,7 +32,7 @@ class EpisodeInfoExample(habitat.Measure):
         # Our measure always contains all the attributes of the episode
         self._metric = vars(episode).copy()
         # But only on reset, it has an additional field of my_value
-        self._metric["my_value"] = self._config.VALUE
+        self._metric["my_value"] = self._config.value
 
     # This is called whenver an action is taken in the environment
     def update_metric(self, *args: Any, episode, action, **kwargs: Any):
@@ -48,7 +49,7 @@ class AgentPositionSensor(habitat.Sensor):
 
         self._sim = sim
         # Prints out the answer to life on init
-        print("The answer to life is", self.config.answer_TO_LIFE)
+        print("The answer to life is", self.config.answer_to_life)
 
     # Defines the name of the sensor in the sensor suite dictionary
     def _get_uuid(self, *args: Any, **kwargs: Any):
@@ -77,25 +78,24 @@ class AgentPositionSensor(habitat.Sensor):
 def main():
     # Get the default config node
     config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
-    config.defrost()
+    with omegaconf.read_write(config), omegaconf.open_dict(config):
+        # Add things to the config to for the measure
+        # The type field is used to look-up the measure in the registry.
+        # By default, the things are registered with the class name
+        config.task.episode_info_example = omegaconf.OmegaConf.create(
+            dict(type="EpisodeInfoExample", value=5)
+        )
 
-    # Add things to the config to for the measure
-    config.task.episode_info_EXAMPLE = habitat.Config()
-    # The type field is used to look-up the measure in the registry.
-    # By default, the things are registered with the class name
-    config.task.episode_info_EXAMPLE.type = "EpisodeInfoExample"
-    config.task.episode_info_EXAMPLE.VALUE = 5
-    # Add the measure to the list of measures in use
-    config.task.measurements.append("episode_info_EXAMPLE")
+        # Add the measure to the list of measures in use
+        config.task.measurements.append("episode_info")
 
-    # Now define the config for the sensor
-    config.task.AGENT_position_SENSOR = habitat.Config()
-    # Use the custom name
-    config.task.AGENT_position_SENSOR.type = "my_supercool_sensor"
-    config.task.AGENT_position_SENSOR.answer_TO_LIFE = 42
-    # Add the sensor to the list of sensors in use
-    config.task.sensors.append("AGENT_position_SENSOR")
-    config.freeze()
+        # Now define the config for the sensor
+        # Use the custom name
+        config.task.agent_position_sensor = omegaconf.OmegaConf.create(
+            dict(type="my_supercool_sensor", answer_to_life=42)
+        )
+        # Add the sensor to the list of sensors in use
+        config.task.sensors.append("agent_position_sensor")
 
     env = habitat.Env(config=config)
     print(env.reset()["agent_position"])

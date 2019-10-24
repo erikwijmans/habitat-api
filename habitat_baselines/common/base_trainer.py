@@ -4,10 +4,12 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import copy
 import os
 import time
 from typing import ClassVar, Dict, List
 
+import omegaconf
 import torch
 
 from habitat import Config, logger
@@ -107,44 +109,6 @@ class BaserlTrainer(BaseTrainer):
                         writer=writer,
                         checkpoint_index=prev_ckpt_ind,
                     )
-
-    def _setup_eval_config(self, checkpoint_config: Config) -> Config:
-        r"""Sets up and returns a merged config for evaluation. Config
-            object saved from checkpoint is merged into config file specified
-            at evaluation time with the following overwrite priority:
-                  eval_opts > ckpt_opts > eval_cfg > ckpt_cfg
-            If the saved config is outdated, only the eval config is returned.
-
-        Args:
-            checkpoint_config: saved config from checkpoint.
-
-        Returns:
-            Config: merged config for eval.
-        """
-
-        config = self.config.clone()
-
-        ckpt_cmd_opts = checkpoint_config.cmd_trailing_opts
-        eval_cmd_opts = config.cmd_trailing_opts
-
-        try:
-            config.merge_from_other_cfg(checkpoint_config)
-            config.merge_from_other_cfg(self.config)
-            config.merge_from_list(ckpt_cmd_opts)
-            config.merge_from_list(eval_cmd_opts)
-        except KeyError:
-            logger.info("Saved config is outdated, using solely eval config")
-            config = self.config.clone()
-            config.merge_from_list(eval_cmd_opts)
-
-        if config.task_CONFIG.dataset.split == "train":
-            config.task_CONFIG.defrost()
-            config.task_CONFIG.dataset.split = "val"
-
-        config.task_CONFIG.simulator.agent_0.sensors = self.config.sensors
-        config.freeze()
-
-        return config
 
     def _eval_checkpoint(
         self,

@@ -26,7 +26,7 @@ def test_overwrite_options():
     for steps_limit in range(MAX_TEST_STEPS_LIMIT):
         config = get_config(
             config_paths=CFG_TEST,
-            opts=["environment.max_episode_steps", steps_limit],
+            opts=[f"environment.max_episode_steps={steps_limit}"],
         )
         assert (
             config.environment.max_episode_steps == steps_limit

@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 import gc
 
+import omegaconf
 import pytest
 
 import habitat
@@ -21,8 +22,8 @@ except ImportError:
 @pytest.mark.skipif(not has_torch, reason="Test needs torch")
 def test_demo_notebook():
     config = habitat.get_config("configs/tasks/pointnav_rgbd.yaml")
-    config.defrost()
-    config.dataset.split = "val"
+    with omegaconf.read_write(config):
+        config.dataset.split = "val"
 
     if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
         pytest.skip("Please download the habitat test scenes")

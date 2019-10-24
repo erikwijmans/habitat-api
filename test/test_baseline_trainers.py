@@ -18,7 +18,8 @@ try:
     from habitat_baselines.config.default import get_config
 
     baseline_installed = True
-except ImportError:
+except ImportError as e:
+    print(e)
     baseline_installed = False
 
 
@@ -44,35 +45,10 @@ def test_trainers(test_cfg_path, mode, gpu2gpu):
             pytest.skip("GPU-GPU requires CUDA")
 
     run_exp(
-        test_cfg_path,
+        [test_cfg_path, "configs/tasks/pointnav.yaml"],
         mode,
-        ["task_CONFIG.simulator.habitat_sim_v0.gpu_gpu", str(gpu2gpu)],
+        [f"simulator.habitat_sim_v0.gpu_gpu={gpu2gpu}"],
     )
-
-
-@pytest.mark.skipif(
-    not baseline_installed, reason="baseline sub-module not installed"
-)
-def test_eval_config():
-    ckpt_opts = ["video_option", "[]"]
-    eval_opts = ["video_option", "['disk']"]
-
-    ckpt_cfg = get_config(None, ckpt_opts)
-    assert ckpt_cfg.video_option == []
-    assert ckpt_cfg.cmd_trailing_opts == ["video_option", "[]"]
-
-    eval_cfg = get_config(None, eval_opts)
-    assert eval_cfg.video_option == ["disk"]
-    assert eval_cfg.cmd_trailing_opts == ["video_option", "['disk']"]
-
-    trainer = BaserlTrainer(get_config())
-    assert trainer.config.video_option == ["disk", "tensorboard"]
-    returned_config = trainer._setup_eval_config(checkpoint_config=ckpt_cfg)
-    assert returned_config.video_option == []
-
-    trainer = BaserlTrainer(eval_cfg)
-    returned_config = trainer._setup_eval_config(ckpt_cfg)
-    assert returned_config.video_option == ["disk"]
 
 
 def __do_pause_test(num_envs, envs_to_pause):

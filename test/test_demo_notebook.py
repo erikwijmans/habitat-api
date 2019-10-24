@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 import gc
 
+import omegaconf
 import pytest
 
 import habitat
@@ -13,8 +14,8 @@ from habitat.datasets.pointnav.pointnav_dataset import PointNavDatasetV1
 
 def test_demo_notebook():
     config = habitat.get_config("configs/tasks/pointnav_mp3d.yaml")
-    config.defrost()
-    config.dataset.split = "val"
+    with omegaconf.read_write(config):
+        config.dataset.split = "val"
 
     if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
         pytest.skip(

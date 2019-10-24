@@ -9,6 +9,7 @@ import random
 import time
 
 import numpy as np
+import omegaconf
 import pytest
 
 import habitat
@@ -18,14 +19,14 @@ from habitat.core.embodied_task import Episode
 from habitat.core.logging import logger
 from habitat.datasets import make_dataset
 from habitat.datasets.pointnav.pointnav_dataset import (
-    DEFAULT_scene_PATH_PREFIX,
+    DEFAULT_SCENE_PATH_PREFIX,
     PointNavDatasetV1,
 )
 from habitat.utils.geometry_utils import quaternion_xyzw_to_wxyz
 
 CFG_TEST = "configs/test/habitat_all_sensors_test.yaml"
 CFG_MULTI_TEST = "configs/datasets/pointnav/gibson.yaml"
-PARTIAL_LOAD_sceneS = 3
+PARTIAL_LOAD_SCENES = 3
 NUM_EPISODES = 10
 
 
@@ -69,17 +70,16 @@ def test_multiple_files_scene_path():
     assert (
         len(scenes) > 0
     ), "Expected dataset contains separate episode file per scene."
-    dataset_config.defrost()
-    dataset_config.CONTENT_sceneS = scenes[:PARTIAL_LOAD_sceneS]
-    dataset_config.sceneS_DIR = os.path.join(
-        os.getcwd(), DEFAULT_scene_PATH_PREFIX
-    )
-    dataset_config.freeze()
+    with omegaconf.read_write(dataset_config):
+        dataset_config.content_scenes = scenes[:PARTIAL_LOAD_SCENES]
+        dataset_config.scenes_dir = os.path.join(
+            os.getcwd(), DEFAULT_SCENE_PATH_PREFIX
+        )
     partial_dataset = make_dataset(
         id_dataset=dataset_config.type, config=dataset_config
     )
     assert (
-        len(partial_dataset.scene_ids) == PARTIAL_LOAD_sceneS
+        len(partial_dataset.scene_ids) == PARTIAL_LOAD_SCENES
     ), "Number of loaded scenes doesn't correspond."
     print(partial_dataset.episodes[0].scene_id)
     assert os.path.exists(
@@ -97,14 +97,13 @@ def test_multiple_files_pointnav_dataset():
     assert (
         len(scenes) > 0
     ), "Expected dataset contains separate episode file per scene."
-    dataset_config.defrost()
-    dataset_config.CONTENT_sceneS = scenes[:PARTIAL_LOAD_sceneS]
-    dataset_config.freeze()
+    with omegaconf.read_write(dataset_config):
+        dataset_config.content_scenes = scenes[:PARTIAL_LOAD_SCENES]
     partial_dataset = make_dataset(
         id_dataset=dataset_config.type, config=dataset_config
     )
     assert (
-        len(partial_dataset.scene_ids) == PARTIAL_LOAD_sceneS
+        len(partial_dataset.scene_ids) == PARTIAL_LOAD_SCENES
     ), "Number of loaded scenes doesn't correspond."
     check_json_serializaiton(partial_dataset)
 
@@ -137,10 +136,10 @@ def check_shortest_path(env, episode):
 
 def test_pointnav_episode_generator():
     config = get_config(CFG_TEST)
-    config.defrost()
-    config.dataset.split = "val"
-    config.environment.max_episode_steps = 500
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.dataset.split = "val"
+        config.environment.max_episode_steps = 500
+
     if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
         pytest.skip("Test skipped as dataset files are missing.")
     env = habitat.Env(config)

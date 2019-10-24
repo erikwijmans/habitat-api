@@ -12,6 +12,7 @@ import time
 from math import pi
 
 import numpy as np
+import omegaconf
 import orbslam2
 import PIL
 import requests
@@ -74,16 +75,16 @@ def make_good_config_for_orbslam2(config):
     config.simulator.rgb_sensor.height = 256
     config.simulator.depth_sensor.width = 256
     config.simulator.depth_sensor.height = 256
-    config.TRAINER.orbslam2.CAMERA_height = config.simulator.depth_sensor.position[
+    config.trainer.orbslam2.camera_height = config.simulator.depth_sensor.position[
         1
     ]
-    config.TRAINER.orbslam2.h_obstacle_min = (
-        0.3 * config.TRAINER.orbslam2.CAMERA_height
+    config.trainer.orbslam2.h_obstacle_min = (
+        0.3 * config.trainer.orbslam2.camera_height
     )
-    config.TRAINER.orbslam2.h_obstacle_max = (
-        1.0 * config.TRAINER.orbslam2.CAMERA_height
+    config.trainer.orbslam2.h_obstacle_max = (
+        1.0 * config.trainer.orbslam2.camera_height
     )
-    config.TRAINER.orbslam2.min_pts_in_obstacle = (
+    config.trainer.orbslam2.min_pts_in_obstacle = (
         config.simulator.depth_sensor.width / 2.0
     )
     return
@@ -191,7 +192,7 @@ class orbslam2Agent(RandomAgent):
         self.depth_denorm = config.depth_denorm
         self.planned_waypoints = []
         self.mapper = DirectDepthMapper(
-            camera_height=config.CAMERA_height,
+            camera_height=config.camera_height,
             near_th=config.d_obstacle_min,
             far_th=config.d_obstacle_max,
             h_min=config.h_obstacle_min,
@@ -551,7 +552,7 @@ class orbslam2MonodepthAgent(orbslam2Agent):
         self.depth_denorm = config.depth_denorm
         self.planned_waypoints = []
         self.mapper = DirectDepthMapper(
-            camera_height=config.CAMERA_height,
+            camera_height=config.camera_height,
             near_th=config.d_obstacle_min,
             far_th=config.d_obstacle_max,
             h_min=config.h_obstacle_min,
@@ -608,16 +609,16 @@ def main():
 
     config = get_config()
     agent_config = cfg_baseline()
-    config.defrost()
-    config.BASELINE = agent_config.BASELINE
-    make_good_config_for_orbslam2(config)
+    with omegaconf.read_write(config):
+        config.baseline = agent_config.baseline
+        make_good_config_for_orbslam2(config)
 
     if args.agent_type == "blind":
-        agent = BlindAgent(config.TRAINER.orbslam2)
+        agent = BlindAgent(config.trainer.orbslam2)
     elif args.agent_type == "orbslam2-rgbd":
-        agent = orbslam2Agent(config.TRAINER.orbslam2)
+        agent = orbslam2Agent(config.trainer.orbslam2)
     elif args.agent_type == "orbslam2-rgb-monod":
-        agent = orbslam2MonodepthAgent(config.TRAINER.orbslam2)
+        agent = orbslam2MonodepthAgent(config.trainer.orbslam2)
     else:
         raise ValueError(args.agent_type, "is unknown type of agent")
     benchmark = habitat.Benchmark(args.task_config)

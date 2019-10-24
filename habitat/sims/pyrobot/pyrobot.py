@@ -62,8 +62,8 @@ def _resize_observation(obs, observation_space, config):
 MM_IN_METER = 1000  # millimeters in a meter
 ACTION_SPACES = {
     "locobot": {
-        "BASE_actions": _locobot_base_action_space(),
-        "CAMERA_actions": _locobot_camera_action_space(),
+        "base_actions": _locobot_base_action_space(),
+        "camera_actions": _locobot_camera_action_space(),
     }
 }
 
@@ -189,7 +189,7 @@ class PyRobot(Simulator):
         assert (
             self._config.robot in self._config.robots
         ), "Invalid robot type {}".format(self._config.robot)
-        self._robot_config = getattr(self._config, self._config.robot.upper())
+        self._robot_config = getattr(self._config, self._config.robot)
 
         action_spaces_dict = {}
 
@@ -223,9 +223,7 @@ class PyRobot(Simulator):
     def _robot_action_space(self, robot_type, robot_config):
         action_spaces_dict = {}
         for action in robot_config.actions:
-            action_spaces_dict[action] = ACTION_SPACES[robot_type.upper()][
-                action
-            ]
+            action_spaces_dict[action] = ACTION_SPACES[robot_type][action]
         return spaces.Dict(action_spaces_dict)
 
     @property
@@ -248,9 +246,9 @@ class PyRobot(Simulator):
         of namesake methods in PyRobot
         (https://github.com/facebookresearch/pyrobot).
         """
-        if action in self._robot_config.BASE_actions:
+        if action in self._robot_config.base_actions:
             getattr(self._robot.base, action)(**action_params)
-        elif action in self._robot_config.CAMERA_actions:
+        elif action in self._robot_config.camera_actions:
             getattr(self._robot.camera, action)(**action_params)
         else:
             raise ValueError("Invalid action {}".format(action))

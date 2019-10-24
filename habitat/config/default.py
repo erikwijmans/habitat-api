@@ -13,6 +13,8 @@ import omegaconf
 
 from habitat.core.utils import Singleton
 
+Config = omegaconf.DictConfig
+
 
 class _HabitatBaseConfigSearcher(metaclass=Singleton):
     config_paths: List[str] = []
@@ -68,7 +70,7 @@ HabitatBaseConfigSearcher.add_recursive_search_path(
 def get_config(
     config_paths: Optional[Union[List[str], str]] = None,
     opts: Optional[list] = None,
-) -> omegaconf.OmegaConf:
+) -> Config:
     r"""Create a unified config with default values overwritten by values from
     :p:`config_paths` and overwritten by options from :p:`opts`.
 
@@ -91,12 +93,12 @@ def get_config(
                 cfg, omegaconf.OmegaConf.load(path)
             )
 
+    omegaconf.OmegaConf.set_struct(cfg, True)
     if opts is not None:
         cfg = omegaconf.OmegaConf.merge(
-            cfg, omegaconf.OmegaConf.from_dotlist(ops)
+            cfg, omegaconf.OmegaConf.from_dotlist(opts)
         )
 
     omegaconf.OmegaConf.set_readonly(cfg, True)
-    omegaconf.OmegaConf.set_struct(cfg, True)
 
     return cfg

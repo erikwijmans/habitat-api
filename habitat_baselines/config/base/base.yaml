@@ -1,7 +1,5 @@
-base_task_config_path: configs/tasks/pointnav.yaml
 checkpoint_folder: data/checkpoints
 checkpoint_interval: 50
-cmd_trailing_opts: []
 env_name: NavRLEnv
 eval_ckpt_path_dir: data/checkpoints
 log_file: train.log

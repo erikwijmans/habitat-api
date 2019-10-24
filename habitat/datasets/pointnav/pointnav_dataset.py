@@ -4,10 +4,13 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import copy
 import gzip
 import json
 import os
 from typing import List, Optional
+
+import omegaconf
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset
@@ -35,7 +38,7 @@ class PointNavDatasetV1(Dataset):
     def check_config_paths_exist(config: Config) -> bool:
         return os.path.exists(
             config.data_path.format(split=config.split)
-        ) and os.path.exists(config.sceneS_DIR)
+        ) and os.path.exists(config.scenes_dir)
 
     @staticmethod
     def get_scenes_to_load(config: Config) -> List[str]:
@@ -47,9 +50,9 @@ class PointNavDatasetV1(Dataset):
             config.data_path.format(split=config.split)
         )
 
-        cfg = config.clone()
-        cfg.defrost()
-        cfg.CONTENT_sceneS = []
+        cfg = copy.deepcopy(config)
+        with omegaconf.read_write(cfg):
+            cfg.content_scenes = []
         dataset = PointNavDatasetV1(cfg)
         return PointNavDatasetV1._get_scenes_from_folder(
             content_scenes_path=dataset.content_scenes_path,
@@ -96,7 +99,7 @@ class PointNavDatasetV1(Dataset):
                 data_path=dataset_dir, scene=scene
             )
             with gzip.open(scene_filename, "rt") as f:
-                self.from_json(f.read(), scenes_dir=config.sceneS_DIR)
+                self.from_json(f.read(), scenes_dir=config.scenes_dir)
 
     def from_json(
         self, json_str: str, scenes_dir: Optional[str] = None

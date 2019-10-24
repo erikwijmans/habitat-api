@@ -4,12 +4,14 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import copy
 import os
 import time
 from collections import deque
 from typing import Dict, List
 
 import numpy as np
+import omegaconf
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -59,7 +61,7 @@ class ppoTrainer(BaserlTrainer):
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
             hidden_size=ppo_cfg.hidden_size,
-            goal_sensor_uuid=self.config.task_CONFIG.task.goal_sensor_uuid,
+            goal_sensor_uuid=self.config.task.goal_sensor_uuid,
         )
         self.actor_critic.to(self.device)
 
@@ -374,21 +376,20 @@ class ppoTrainer(BaserlTrainer):
         ckpt_dict = self.load_checkpoint(checkpoint_path, map_location="cpu")
 
         if self.config.eval.use_ckpt_config:
-            config = self._setup_eval_config(ckpt_dict["config"])
+            config = copy.deepcopy(ckpt_dict["config"])
         else:
-            config = self.config.clone()
+            config = copy.deepcopy(self.config)
 
+        print(config.pretty())
         ppo_cfg = config.rl.ppo
 
-        config.defrost()
-        config.task_CONFIG.dataset.split = config.eval.split
-        config.freeze()
+        with omegaconf.read_write(config):
+            config.dataset.split = config.eval.split
 
         if len(self.config.video_option) > 0:
-            config.defrost()
-            config.task_CONFIG.task.measurements.append("top_down_map")
-            config.task_CONFIG.task.measurements.append("collisions")
-            config.freeze()
+            with omegaconf.read_write(config):
+                config.task.measurements.append("top_down_map")
+                config.task.measurements.append("collisions")
 
         logger.info(f"env config: {config}")
         self.envs = construct_envs(
@@ -400,8 +401,8 @@ class ppoTrainer(BaserlTrainer):
         self.actor_critic = self.agent.actor_critic
 
         # get name of performance metric, e.g. "spl"
-        metric_name = self.config.task_CONFIG.task.measurements[0]
-        metric_cfg = getattr(self.config.task_CONFIG.task, metric_name)
+        metric_name = self.config.task.measurements[0]
+        metric_cfg = getattr(self.config.task, metric_name)
         measure_type = baseline_registry.get_measure(metric_cfg.type)
         assert measure_type is not None, "invalid measurement type {}".format(
             metric_cfg.type

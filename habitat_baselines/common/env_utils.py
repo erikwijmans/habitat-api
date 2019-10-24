@@ -4,8 +4,11 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import copy
 import random
 from typing import Type, Union
+
+import omegaconf
 
 import habitat
 from habitat import Config, Env, RLEnv, VectorEnv, make_dataset
@@ -26,9 +29,7 @@ def make_env_fn(
     Returns:
         env object created according to specification.
     """
-    dataset = make_dataset(
-        config.task_CONFIG.dataset.type, config=config.task_CONFIG.dataset
-    )
+    dataset = make_dataset(config.dataset.type, config=config.dataset)
     env = env_class(config=config, dataset=dataset)
     env.seed(rank)
     return env
@@ -53,8 +54,8 @@ def construct_envs(
     num_processes = config.num_processes
     configs = []
     env_classes = [env_class for _ in range(num_processes)]
-    dataset = make_dataset(config.task_CONFIG.dataset.type)
-    scenes = dataset.get_scenes_to_load(config.task_CONFIG.dataset)
+    dataset = make_dataset(config.dataset.type)
+    scenes = dataset.get_scenes_to_load(config.dataset)
 
     if len(scenes) > 0:
         random.shuffle(scenes)
@@ -71,23 +72,19 @@ def construct_envs(
     assert sum(map(len, scene_splits)) == len(scenes)
 
     for i in range(num_processes):
+        proc_config = copy.deepcopy(config)
 
-        task_config = config.task_CONFIG.clone()
-        task_config.defrost()
-        if len(scenes) > 0:
-            task_config.dataset.CONTENT_sceneS = scene_splits[i]
+        with omegaconf.read_write(proc_config):
+            if len(scenes) > 0:
+                proc_config.dataset.content_scenes = scene_splits[i]
 
-        task_config.simulator.habitat_sim_v0.gpu_device_id = (
-            config.simulator_GPU_ID
-        )
+            proc_config.simulator.habitat_sim_v0.gpu_device_id = (
+                config.simulator_gpu_id
+            )
 
-        task_config.simulator.agent_0.sensors = config.sensors
-        task_config.freeze()
+            proc_config.simulator.agent_0.sensors = config.sensors
 
-        config.defrost()
-        config.task_CONFIG = task_config
-        config.freeze()
-        configs.append(config.clone())
+        configs.append(proc_config)
 
     envs = habitat.VectorEnv(
         make_env_fn=make_env_fn,

@@ -6,6 +6,7 @@
 
 import os
 
+import omegaconf
 import pytest
 
 import habitat
@@ -34,13 +35,13 @@ def test_ppo_agents():
     benchmark = habitat.Benchmark(config_paths=CFG_TEST)
 
     for input_type in ["blind", "rgb", "depth", "rgbd"]:
-        config_env.defrost()
-        config_env.simulator.agent_0.sensors = []
-        if input_type in ["rgb", "rgbd"]:
-            config_env.simulator.agent_0.sensors += ["rgb_sensor"]
-        if input_type in ["depth", "rgbd"]:
-            config_env.simulator.agent_0.sensors += ["depth_sensor"]
-        config_env.freeze()
+        with omegaconf.read_write(config_env):
+            config_env.simulator.agent_0.sensors = []
+            if input_type in ["rgb", "rgbd"]:
+                config_env.simulator.agent_0.sensors.append("rgb_sensor")
+            if input_type in ["depth", "rgbd"]:
+                config_env.simulator.agent_0.sensors.append("depth_sensor")
+
         del benchmark._env
         benchmark._env = habitat.Env(config=config_env)
         agent_config.INPUT_type = input_type

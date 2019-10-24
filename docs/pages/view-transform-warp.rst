@@ -23,6 +23,7 @@ validate that transformation comparing projected and original views.
         import os
         import numpy as np
         import quaternion
+        import omegaconfg
 
         import matplotlib.pyplot as plt
         %matplotlib inline
@@ -35,15 +36,12 @@ validate that transformation comparing projected and original views.
 
         # Set up the environment for testing
         config = habitat.get_config(config_paths="../configs/tasks/pointnav_rgbd.yaml")
-        config.defrost()
-        config.dataset.data_path = '../data/datasets/pointnav/habitat-test-scenes/v1/val/val.json.gz'
-        config.dataset.sceneS_DIR = '../data/scene_datasets/'
-        config.freeze()
+        with omegaconfg.read_write(config):
+            config.dataset.data_path = '../data/datasets/pointnav/habitat-test-scenes/v1/val/val.json.gz'
+            config.dataset.scenes_dir = '../data/scene_datasets/'
 
         # Can also do directly in the config file
-        config.defrost()
-        config.simulator.depth_sensor.normalize_depth = False
-        config.freeze()
+            config.simulator.depth_sensor.normalize_depth = False
 
         # Intrinsic parameters, assuming width matches height. Requires a simple refactor otherwise
         W = config.simulator.depth_sensor.width

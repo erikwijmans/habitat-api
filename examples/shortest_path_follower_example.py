@@ -8,6 +8,7 @@ import os
 import shutil
 
 import numpy as np
+import omegaconf
 
 import habitat
 from habitat.core.utils import try_cv2_import
@@ -63,10 +64,10 @@ def draw_top_down_map(info, heading, output_size):
 
 def shortest_path_example(mode):
     config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
-    config.defrost()
-    config.task.measurements.append("top_down_map")
-    config.task.sensors.append("heading_sensor")
-    config.freeze()
+    with omegaconf.read_write(config):
+        config.task.measurements.append("top_down_map")
+        config.task.sensors.append("heading_sensor")
+
     env = SimpleRLEnv(config=config)
     goal_radius = env.episodes[0].goals[0].radius
     if goal_radius is None:

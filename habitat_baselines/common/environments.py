@@ -33,7 +33,7 @@ def get_env_class(env_name: str) -> Type[habitat.RLEnv]:
 class NavRLEnv(habitat.RLEnv):
     def __init__(self, config: Config, dataset: Optional[Dataset] = None):
         self._rl_config = config.rl
-        self._core_env_config = config.task_CONFIG
+        self._core_env_config = config
 
         self._previous_target_distance = None
         self._previous_action = None
