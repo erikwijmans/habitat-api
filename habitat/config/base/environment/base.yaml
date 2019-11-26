@@ -1,3 +1,0 @@
-environment:
-  max_episode_seconds: 10000000
-  max_episode_steps: 1000

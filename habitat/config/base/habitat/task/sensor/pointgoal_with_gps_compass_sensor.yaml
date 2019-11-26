@@ -1,0 +1,7 @@
+habitat:
+  task:
+    sensor:
+      pointgoal_with_gps_compass_sensor:
+        dimensionality: 2
+        goal_format: polar
+        type: PointGoalWithGPSCompassSensor

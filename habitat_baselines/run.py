@@ -6,7 +6,6 @@
 
 import argparse
 import random
-from typing import List
 
 import numpy as np
 
@@ -23,19 +22,23 @@ def main():
         help="run type of the experiment (train or eval)",
     )
     parser.add_argument(
-        "--exp-configs",
-        nargs="+",
+        "--exp-config",
+        type=str,
+        required=True,
         help="path to config yaml containing info about experiment",
     )
     parser.add_argument(
-        "--opts", nargs="*", help="Modify config options from command line"
+        "opts",
+        default=None,
+        nargs=argparse.REMAINDER,
+        help="Modify config options from command line",
     )
 
     args = parser.parse_args()
     run_exp(**vars(args))
 
 
-def run_exp(exp_config: List[str], run_type: str, opts=None) -> None:
+def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     r"""Runs experiment given mode and config
 
     Args:
@@ -48,11 +51,11 @@ def run_exp(exp_config: List[str], run_type: str, opts=None) -> None:
     """
     config = get_config(exp_config, opts)
 
-    random.seed(config.seed)
-    np.random.seed(config.seed)
+    random.seed(config.TASK_CONFIG.SEED)
+    np.random.seed(config.TASK_CONFIG.SEED)
 
-    trainer_init = baseline_registry.get_trainer(config.trainer_name)
-    assert trainer_init is not None, f"{config.trainer_name} is not supported"
+    trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
+    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
     trainer = trainer_init(config)
 
     if run_type == "train":

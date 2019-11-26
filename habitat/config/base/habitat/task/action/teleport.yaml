@@ -1,0 +1,5 @@
+habitat:
+  task:
+    action:
+      teleport:
+        type: TeleportAction

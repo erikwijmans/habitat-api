@@ -1,0 +1,5 @@
+habitat:
+  task:
+    action:
+      turn_right:
+        type: TurnRightAction

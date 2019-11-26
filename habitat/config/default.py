@@ -9,96 +9,44 @@ import os
 import os.path as osp
 from typing import List, Optional, Union
 
+import hydra
+import hydra.experimental
 import omegaconf
-
-from habitat.core.utils import Singleton
-
-Config = omegaconf.DictConfig
-
-
-class _HabitatBaseConfigSearcher(metaclass=Singleton):
-    config_paths: List[str] = []
-    search_paths: List[str] = []
-    recursive_search_paths: List[str] = []
-
-    @classmethod
-    def add_config_path(cls, path: str):
-        assert osp.exists(path), f'"{path}" does not exist'
-        cls.config_paths.append(path)
-
-    @classmethod
-    def add_search_path(cls, path: str):
-        assert osp.exists(path), f'"{path}" does not exist'
-        cls.search_paths.append(path)
-
-    @classmethod
-    def add_recursive_search_path(cls, path: str):
-        assert osp.exists(path), f'"{path}" does not exist'
-        cls.recursive_search_paths.append(path)
-
-    @classmethod
-    def build_cfg(cls) -> omegaconf.OmegaConf:
-        cfg = omegaconf.OmegaConf.create()
-
-        for cfg_file in cls.config_paths:
-            cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.load(cfg))
-
-        for search_path in cls.search_paths:
-            for f in glob.glob(osp.join(search_path, "*.yaml")):
-                cfg = omegaconf.OmegaConf.merge(
-                    cfg, omegaconf.OmegaConf.load(f)
-                )
-
-        for search_path in cls.recursive_search_paths:
-            for f in glob.glob(
-                osp.join(search_path, "**/*.yaml"), recursive=True
-            ):
-                cfg = omegaconf.OmegaConf.merge(
-                    cfg, omegaconf.OmegaConf.load(f)
-                )
-
-        return cfg
-
-
-HabitatBaseConfigSearcher = _HabitatBaseConfigSearcher()
-
-HabitatBaseConfigSearcher.add_recursive_search_path(
-    osp.join(osp.abspath(osp.dirname(__file__)), "base")
-)
+from hydra._internal.hydra import GlobalHydra
 
 
 def get_config(
-    config_paths: Optional[Union[List[str], str]] = None,
-    opts: Optional[list] = None,
-) -> Config:
-    r"""Create a unified config with default values overwritten by values from
-    :p:`config_paths` and overwritten by options from :p:`opts`.
+    config_file: Optional[str] = None, overrides: Optional[List[str]] = None
+):
+    assert GlobalHydra().is_initialized(), "Must initialize hydra"
 
-    :param config_paths: List of config paths or string that contains comma
-        separated list of config paths.
-    :param opts: Config options (keys, values) in a list (e.g., passed from
-        command line into the config. For example,
-        :py:`opts = ['FOO.BAR', 0.5]`. Argument can be used for parameter
-        sweeping or quick tests.
-    """
+    if not any(
+        path.provider == "habitat"
+        for path in GlobalHydra().hydra.config_loader.config_search_path.config_search_path
+    ):
+        GlobalHydra().hydra.config_loader.config_search_path.prepend(
+            "habitat", "pkg://habitat.config.base"
+        )
 
-    cfg = HabitatBaseConfigSearcher.build_cfg()
+    cfg = hydra.experimental.compose("habitat_base.yaml", [])
+    if config_file is not None:
+        extended_cfg_defaults = hydra.experimental.compose(
+            config_file, [], strict=True
+        )
+        extended_cfg_overrides = omegaconf.OmegaConf.load(config_file)
+        if "defaults" in extended_cfg_overrides:
+            del extended_cfg_overrides["defaults"]
 
-    if config_paths is not None:
-        if isinstance(config_paths, str):
-            config_paths = config_paths.split(",")
-
-        for path in config_paths:
-            cfg = omegaconf.OmegaConf.merge(
-                cfg, omegaconf.OmegaConf.load(path)
-            )
-
-    omegaconf.OmegaConf.set_struct(cfg, True)
-    if opts is not None:
         cfg = omegaconf.OmegaConf.merge(
-            cfg, omegaconf.OmegaConf.from_dotlist(opts)
+            cfg, extended_cfg_defaults, extended_cfg_overrides
+        )
+
+    if overrides is not None:
+        cfg = omegaconf.OmegaConf.merge(
+            cfg, omegaconf.OmegaConf.from_dotlist(overrides)
         )
 
     omegaconf.OmegaConf.set_readonly(cfg, True)
+    omegaconf.OmegaConf.set_struct(cfg, True)
 
     return cfg

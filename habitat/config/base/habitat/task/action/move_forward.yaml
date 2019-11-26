@@ -1,0 +1,5 @@
+habitat:
+  task:
+    action:
+      move_forward:
+        type: MoveForwardAction

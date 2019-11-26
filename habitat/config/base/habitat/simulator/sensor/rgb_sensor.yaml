@@ -1,0 +1,9 @@
+habitat:
+  simulator:
+    sensor:
+      rgb_sensor:
+        height: 480
+        hfov: 90
+        position: [0, 1.25, 0]
+        type: HabitatSimRGBSensor
+        width: 640

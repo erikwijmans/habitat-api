@@ -1,3 +1,0 @@
-eval:
-  split: val
-  use_ckpt_config: true

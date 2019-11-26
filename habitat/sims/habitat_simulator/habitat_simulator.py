@@ -153,8 +153,11 @@ class HabitatSim(Simulator):
         agent_config = self._get_agent_config()
 
         sim_sensors = []
-        for sensor_name in agent_config.sensors:
-            sensor_cfg = getattr(self.config, sensor_name)
+        for sensor_name in config.sensor:
+            sensor_cfg = getattr(self.config.sensor, sensor_name)
+            if "type" not in sensor_cfg:
+                logger.warn(f"Skipping sensor {sensor_name}")
+
             sensor_type = registry.get_sensor(sensor_cfg.type)
 
             assert sensor_type is not None, "invalid sensor type {}".format(
@@ -363,8 +366,8 @@ class HabitatSim(Simulator):
     def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
         if agent_id is None:
             agent_id = self.config.default_agent_id
-        agent_name = self.config.agents[agent_id]
-        agent_config = getattr(self.config, agent_name)
+        agent_name = f"agent_{agent_id}"
+        agent_config = getattr(self.config.agent, agent_name)
         return agent_config
 
     def get_agent_state(self, agent_id: int = 0) -> habitat_sim.AgentState:

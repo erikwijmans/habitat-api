@@ -1,0 +1,40 @@
+defaults:
+    - trainer: ppo
+    - env: nav_rl
+    - task: pointnav/rgbd
+    - task: pointnav/gps
+
+
+task_configs: False
+task_overrides: False
+
+logging:
+    log_file: train.log
+    log_interval: 10
+    checkpoint_folder: data/checkpoints
+    checkpoint_interval: 50
+
+
+eval:
+    ckpt_path_dir: data/checkpoints
+    test_episode_count: 2
+    split: val
+    use_ckpt_config: true
+
+
+agent_sensors:
+    - rgb_sensor
+    - depth_sensor
+
+simulator_gpu_id: 0
+torch_gpu_id: 0
+
+run_type: train
+
+tensorboard:
+    dir: tb
+    video_dir: video_dir
+
+    video_option:
+        - disk
+        - tensorboard

@@ -1,0 +1,5 @@
+habitat:
+  task:
+    action:
+      look_up:
+        type: LookUpAction

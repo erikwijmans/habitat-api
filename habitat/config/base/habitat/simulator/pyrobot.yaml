@@ -1,0 +1,16 @@
+habtat:
+  simulator:
+    type: PyRobot-v0
+
+
+habtat:
+  pyrobot:
+    base_controller: proportional
+    base_planner: none
+    robot: locobot
+    robots:
+    - locobot
+    sensors:
+    - rgb_sensor
+    - depth_sensor
+    - bump_sensor

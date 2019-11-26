@@ -1,0 +1,7 @@
+habitat:
+  dataset:
+    content_scenes: ['*']
+    data_path: data/datasets/pointnav/habitat-test-scenes/v1/{split}/{split}.json.gz
+    scenes_dir: data/scene_datasets
+    split: train
+    type: PointNav-v1
