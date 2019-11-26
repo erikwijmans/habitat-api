@@ -34,5 +34,5 @@ habitat:
         dimensionality: 2
 
     measure:
-      SPL:
+      spl:
         success_distance: 0.2

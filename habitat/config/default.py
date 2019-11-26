@@ -30,16 +30,16 @@ def get_config(
 
     cfg = hydra.experimental.compose("habitat_base.yaml", [])
     if config_file is not None:
-        extended_cfg_defaults = hydra.experimental.compose(
-            config_file, [], strict=True
-        )
+        extended_cfg_defaults = hydra.experimental.compose(config_file, [])
         extended_cfg_overrides = omegaconf.OmegaConf.load(config_file)
         if "defaults" in extended_cfg_overrides:
             del extended_cfg_overrides["defaults"]
 
-        cfg = omegaconf.OmegaConf.merge(
-            cfg, extended_cfg_defaults, extended_cfg_overrides
-        )
+        cfg = omegaconf.OmegaConf.merge(cfg, extended_cfg_defaults)
+        omegaconf.OmegaConf.set_struct(cfg, True)
+        cfg = omegaconf.OmegaConf.merge(cfg, extended_cfg_overrides)
+
+    omegaconf.OmegaConf.set_struct(cfg, True)
 
     if overrides is not None:
         cfg = omegaconf.OmegaConf.merge(
@@ -47,6 +47,5 @@ def get_config(
         )
 
     omegaconf.OmegaConf.set_readonly(cfg, True)
-    omegaconf.OmegaConf.set_struct(cfg, True)
 
     return cfg

@@ -1,6 +1,6 @@
 habitat:
   task:
     measure:
-      SPL:
+      spl:
         success_distance: 0.2
         type: SPL
