@@ -18,7 +18,7 @@ one parameter that could come from the command line:
     merged_config = get_config(
         config_paths=["configs/tasks/pointnav.yaml",
             "configs/dataset/val.yaml"],
-        opts=["environment.max_episode_steps", steps_limit]
+        opts=["ENVIRONMENT.MAX_EPISODE_STEPS", steps_limit]
     )
 
 ```
@@ -34,9 +34,9 @@ Below is the structure of config used for Habitat:
         - Sensors
 - Dataset
 
-We use node names (e.g. `sensors: ['rgb_sensor', 'depth_sensor']`) instead of list
-of config nodes (e.g. `sensors: [{type = "HabitatSimDepthSensor",
-min_depth = 0}, ...]`) to declare the Sensors attached to an Agent or Measures
+We use node names (e.g. `SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']`) instead of list
+of config nodes (e.g. `SENSORS: [{TYPE = "HabitatSimDepthSensor",
+MIN_DEPTH = 0}, ...]`) to declare the Sensors attached to an Agent or Measures
 enabled for the Task . With this approach, it's still easy to overwrite a
 particular sensor parameter in yaml file without redefining the whole sensor
 config.
@@ -53,10 +53,10 @@ from typing import List, Optional, Union
 _C = habitat.get_config()
 _C.defrost()
 # Add new parameters to the config
-_C.task.episode_info = habitat.Config()
-_C.task.episode_info.type = "EpisodeInfo"
-_C.task.episode_info.VALUE = 5
-_C.task.measurements.append("episode_info")
+_C.TASK.EPISODE_INFO = habitat.Config()
+_C.TASK.EPISODE_INFO.TYPE = "EpisodeInfo"
+_C.TASK.EPISODE_INFO.VALUE = 5
+_C.TASK.MEASUREMENTS.append("EPISODE_INFO")
 
 # New function returning extended Habitat config that should be used instead
 # of habitat.get_config()

@@ -1,5 +1,6 @@
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/facebookresearch/habitat-api/blob/master/LICENSE)
 [![CircleCI](https://circleci.com/gh/facebookresearch/habitat-api.svg?style=shield)](https://circleci.com/gh/facebookresearch/habitat-api)
+[![codecov](https://codecov.io/gh/facebookresearch/habitat-api/branch/master/graph/badge.svg)](https://codecov.io/gh/facebookresearch/habitat-api)
 
 Habitat-API
 ==============================
@@ -28,9 +29,9 @@ We also have a dev slack channel, please follow this [link](https://join.slack.c
    1. [Details](#details)
    1. [Data](#data)
    1. [Baselines](#baselines)
-   1. [Acknowledgments](#acknowledgments)
    1. [License](#license)
-   1. [References](#references)
+   1. [Acknowledgments](#acknowledgments)
+   1. [References](#references-and-citation)
 
 ## Motivation
 While there has been significant progress in the vision and language communities thanks to recent advances in deep representations, we believe there is a growing disconnect between ‘internet AI’ and embodied AI. The focus of the former is pattern recognition in images, videos, and text on datasets typically curated from the internet. The focus of the latter is to enable action by an embodied agent in an environment (e.g. a robot). This brings to the forefront issues of active perception, long-term planning, learning from interaction, and holding a dialog grounded in an environment.
@@ -43,7 +44,7 @@ If you use the Habitat platform in your research, please cite the following [pap
 ```
 @inproceedings{habitat19iccv,
   title     =     {Habitat: {A} {P}latform for {E}mbodied {AI} {R}esearch},
-  author    =     {{Manolis Savva*} and {Abhishek Kadian*} and {Oleksandr Maksymets*} and Yili Zhao and Erik Wijmans and Bhavana Jain and Julian Straub and Jia Liu and Vladlen Koltun and Jitendra Malik and Devi Parikh and Dhruv Batra},
+  author    =     {Manolis Savva and Abhishek Kadian and Oleksandr Maksymets and Yili Zhao and Erik Wijmans and Bhavana Jain and Julian Straub and Jia Liu and Vladlen Koltun and Jitendra Malik and Devi Parikh and Dhruv Batra},
   booktitle =     {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
   year      =     {2019}
 }
@@ -172,7 +173,11 @@ Habitat-API supports deployment of models on a physical robot through PyRobot (h
 The Habitat project would not have been possible without the support and contributions of many individuals. We would like to thank Dmytro Mishkin, Xinlei Chen, Georgia Gkioxari, Daniel Gordon, Leonidas Guibas, Saurabh Gupta, Or Litany, Marcus Rohrbach, Amanpreet Singh, Devendra Singh Chaplot, Yuandong Tian, and Yuxin Wu for many helpful conversations and guidance on the design and development of the Habitat platform.
 
 ## License
-Habitat-API is MIT licensed. See the LICENSE file for details.
+Habitat-API is MIT licensed. See the [LICENSE file](habitat_baselines/LICENSE) for details.
+
+The trained models and the task datasets are considered data derived from the correspondent scene datasets.
+- Matterport3D based task datasets and trained models are distributed with [Matterport3D Terms of Use](http://kaldir.vc.in.tum.de/matterport/MP_TOS.pdf) and under [CC BY-NC-SA 3.0 US license](https://creativecommons.org/licenses/by-nc-sa/3.0/us/).
+- Gibson based task datasets and trained models are distributed with [Gibson Terms of Use](https://storage.googleapis.com/gibson_material/Agreement%20GDS%2006-04-18.pdf) and under [CC BY-NC-SA 3.0 US license](https://creativecommons.org/licenses/by-nc-sa/3.0/us/).
 
 ## References and Citation
 1. [Habitat: A Platform for Embodied AI Research](https://arxiv.org/abs/1904.01201). Manolis Savva, Abhishek Kadian, Oleksandr Maksymets, Yili Zhao, Erik Wijmans, Bhavana Jain, Julian Straub, Jia Liu, Vladlen Koltun, Jitendra Malik, Devi Parikh, Dhruv Batra. IEEE/CVF International Conference on Computer Vision (ICCV), 2019.

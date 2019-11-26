@@ -10,13 +10,13 @@ python setup.py develop --all
 This will also install additional requirements for each sub-module in `habitat_baselines/`, which are specified in `requirements.txt` files located in the sub-module directory.
 
 
-### Reinforcement Learning (rl)
+### Reinforcement Learning (RL)
 
-**Proximal Policy Optimization (ppo)**
+**Proximal Policy Optimization (PPO)**
 
 **paper**: [https://arxiv.org/abs/1707.06347](https://arxiv.org/abs/1707.06347)
 
-**code**: majority of the ppo implementation is taken from
+**code**: majority of the PPO implementation is taken from
 [pytorch-a2c-ppo-acktr](https://github.com/ikostrikov/pytorch-a2c-ppo-acktr).
 
 **dependencies**: pytorch 1.0, for installing refer to [pytorch.org](https://pytorch.org/)
@@ -33,7 +33,7 @@ python -u habitat_baselines/run.py --exp-config habitat_baselines/config/pointna
 python -u habitat_baselines/run.py --exp-config habitat_baselines/config/pointnav/ppo_pointnav.yaml --run-type eval
 ```
 
-We also provide trained RGB, RGBD, Blind ppo models.
+We also provide trained RGB, RGBD, Blind PPO models.
 To use them download pre-trained pytorch models from [link](https://dl.fbaipublicfiles.com/habitat/data/baselines/v1/habitat_baselines_v1.zip) and unzip and specify model path [here](agents/ppo_agents.py#L132).
 
 Change field `task_config` in `habitat_baselines/config/pointnav/ppo_pointnav.yaml` to `tasks/pointnav_mp3d.yaml` for training on [MatterPort3D point goal navigation dataset](/README.md#task-datasets).

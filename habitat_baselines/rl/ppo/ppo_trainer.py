@@ -4,20 +4,18 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import copy
 import os
 import time
 from collections import deque
 from typing import Dict, List
 
 import numpy as np
-import omegaconf
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config, logger
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.base_trainer import BaserlTrainer
+from habitat_baselines.common.base_trainer import BaseRLTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_envs
 from habitat_baselines.common.environments import get_env_class
@@ -28,12 +26,12 @@ from habitat_baselines.common.utils import (
     generate_video,
     linear_decay,
 )
-from habitat_baselines.rl.ppo import PointNavBaselinePolicy, ppo
+from habitat_baselines.rl.ppo import PPO, PointNavBaselinePolicy
 
 
 @baseline_registry.register_trainer(name="ppo")
-class ppoTrainer(BaserlTrainer):
-    r"""Trainer class for ppo algorithm
+class PPOTrainer(BaseRLTrainer):
+    r"""Trainer class for PPO algorithm
     Paper: https://arxiv.org/abs/1707.06347.
     """
     supported_tasks = ["Nav-v0"]
@@ -47,7 +45,7 @@ class ppoTrainer(BaserlTrainer):
             logger.info(f"config: {config}")
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
-        r"""Sets up actor critic and agent for ppo.
+        r"""Sets up actor critic and agent for PPO.
 
         Args:
             ppo_cfg: config node with relevant params
@@ -55,17 +53,17 @@ class ppoTrainer(BaserlTrainer):
         Returns:
             None
         """
-        logger.add_filehandler(self.config.log_file)
+        logger.add_filehandler(self.config.LOG_FILE)
 
         self.actor_critic = PointNavBaselinePolicy(
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
             hidden_size=ppo_cfg.hidden_size,
-            goal_sensor_uuid=self.config.task.goal_sensor_uuid,
+            goal_sensor_uuid=self.config.TASK_CONFIG.TASK.GOAL_SENSOR_UUID,
         )
         self.actor_critic.to(self.device)
 
-        self.agent = ppo(
+        self.agent = PPO(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
             ppo_epoch=ppo_cfg.ppo_epoch,
@@ -91,7 +89,7 @@ class ppoTrainer(BaserlTrainer):
             "config": self.config,
         }
         torch.save(
-            checkpoint, os.path.join(self.config.checkpoint_folder, file_name)
+            checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
         )
 
     def load_checkpoint(self, checkpoint_path: str, *args, **kwargs) -> Dict:
@@ -198,24 +196,24 @@ class ppoTrainer(BaserlTrainer):
         )
 
     def train(self) -> None:
-        r"""Main method for training ppo.
+        r"""Main method for training PPO.
 
         Returns:
             None
         """
 
         self.envs = construct_envs(
-            self.config, get_env_class(self.config.env_name)
+            self.config, get_env_class(self.config.ENV_NAME)
         )
 
-        ppo_cfg = self.config.rl.ppo
+        ppo_cfg = self.config.RL.PPO
         self.device = (
-            torch.device("cuda", self.config.torch_gpu_id)
+            torch.device("cuda", self.config.TORCH_GPU_ID)
             if torch.cuda.is_available()
             else torch.device("cpu")
         )
-        if not os.path.isdir(self.config.checkpoint_folder):
-            os.makedirs(self.config.checkpoint_folder)
+        if not os.path.isdir(self.config.CHECKPOINT_FOLDER):
+            os.makedirs(self.config.CHECKPOINT_FOLDER)
         self._setup_actor_critic_agent(ppo_cfg)
         logger.info(
             "agent number of parameters: {}".format(
@@ -258,23 +256,27 @@ class ppoTrainer(BaserlTrainer):
 
         lr_scheduler = LambdaLR(
             optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: linear_decay(x, self.config.num_updates),
+            lr_lambda=lambda x: linear_decay(x, self.config.NUM_UPDATES),
         )
 
         with TensorboardWriter(
-            self.config.tensorboard_dir, flush_secs=self.flush_secs
+            self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
         ) as writer:
-            for update in range(self.config.num_updates):
+            for update in range(self.config.NUM_UPDATES):
                 if ppo_cfg.use_linear_lr_decay:
                     lr_scheduler.step()
 
                 if ppo_cfg.use_linear_clip_decay:
                     self.agent.clip_param = ppo_cfg.clip_param * linear_decay(
-                        update, self.config.num_updates
+                        update, self.config.NUM_UPDATES
                     )
 
                 for step in range(ppo_cfg.num_steps):
-                    delta_pth_time, delta_env_time, delta_steps = self._collect_rollout_step(
+                    (
+                        delta_pth_time,
+                        delta_env_time,
+                        delta_steps,
+                    ) = self._collect_rollout_step(
                         rollouts,
                         current_episode_reward,
                         episode_rewards,
@@ -284,9 +286,12 @@ class ppoTrainer(BaserlTrainer):
                     env_time += delta_env_time
                     count_steps += delta_steps
 
-                delta_pth_time, value_loss, action_loss, dist_entropy = self._update_agent(
-                    ppo_cfg, rollouts
-                )
+                (
+                    delta_pth_time,
+                    value_loss,
+                    action_loss,
+                    dist_entropy,
+                ) = self._update_agent(ppo_cfg, rollouts)
                 pth_time += delta_pth_time
 
                 window_episode_reward.append(episode_rewards.clone())
@@ -318,7 +323,7 @@ class ppoTrainer(BaserlTrainer):
                 )
 
                 # log stats
-                if update > 0 and update % self.config.log_interval == 0:
+                if update > 0 and update % self.config.LOG_INTERVAL == 0:
                     logger.info(
                         "update: {}\tfps: {:.3f}\t".format(
                             update, count_steps / (time.time() - t_start)
@@ -350,7 +355,7 @@ class ppoTrainer(BaserlTrainer):
                         logger.info("No episodes finish in current window")
 
                 # checkpoint model
-                if update % self.config.checkpoint_interval == 0:
+                if update % self.config.CHECKPOINT_INTERVAL == 0:
                     self.save_checkpoint(f"ckpt.{count_checkpoints}.pth")
                     count_checkpoints += 1
 
@@ -375,37 +380,36 @@ class ppoTrainer(BaserlTrainer):
         # Map location CPU is almost always better than mapping to a CUDA device.
         ckpt_dict = self.load_checkpoint(checkpoint_path, map_location="cpu")
 
-        if self.config.eval.use_ckpt_config:
-            config = copy.deepcopy(ckpt_dict["config"])
+        if self.config.EVAL.USE_CKPT_CONFIG:
+            config = self._setup_eval_config(ckpt_dict["config"])
         else:
-            config = copy.deepcopy(self.config)
+            config = self.config.clone()
 
-        print(config.pretty())
-        ppo_cfg = config.rl.ppo
+        ppo_cfg = config.RL.PPO
 
-        with omegaconf.read_write(config):
-            config.dataset.split = config.eval.split
+        config.defrost()
+        config.TASK_CONFIG.DATASET.SPLIT = config.EVAL.SPLIT
+        config.freeze()
 
-        if len(self.config.video_option) > 0:
-            with omegaconf.read_write(config):
-                config.task.measurements.append("top_down_map")
-                config.task.measurements.append("collisions")
+        if len(self.config.VIDEO_OPTION) > 0:
+            config.defrost()
+            config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
+            config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
+            config.freeze()
 
         logger.info(f"env config: {config}")
-        self.envs = construct_envs(
-            self.config, get_env_class(self.config.env_name)
-        )
+        self.envs = construct_envs(config, get_env_class(config.ENV_NAME))
         self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
         self.actor_critic = self.agent.actor_critic
 
         # get name of performance metric, e.g. "spl"
-        metric_name = self.config.task.measurements[0]
-        metric_cfg = getattr(self.config.task, metric_name)
-        measure_type = baseline_registry.get_measure(metric_cfg.type)
+        metric_name = self.config.TASK_CONFIG.TASK.MEASUREMENTS[0]
+        metric_cfg = getattr(self.config.TASK_CONFIG.TASK, metric_name)
+        measure_type = baseline_registry.get_measure(metric_cfg.TYPE)
         assert measure_type is not None, "invalid measurement type {}".format(
-            metric_cfg.type
+            metric_cfg.TYPE
         )
         self.metric_uuid = measure_type(
             sim=None, task=None, config=None
@@ -420,32 +424,37 @@ class ppoTrainer(BaserlTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
-            self.config.num_processes,
+            self.config.NUM_PROCESSES,
             ppo_cfg.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            self.config.num_processes, 1, device=self.device, dtype=torch.long
+            self.config.NUM_PROCESSES, 1, device=self.device, dtype=torch.long
         )
         not_done_masks = torch.zeros(
-            self.config.num_processes, 1, device=self.device
+            self.config.NUM_PROCESSES, 1, device=self.device
         )
         stats_episodes = dict()  # dict of dicts that stores stats per episode
 
         rgb_frames = [
-            [] for _ in range(self.config.num_processes)
+            [] for _ in range(self.config.NUM_PROCESSES)
         ]  # type: List[List[np.ndarray]]
-        if len(self.config.video_option) > 0:
-            os.makedirs(self.config.video_dir, exist_ok=True)
+        if len(self.config.VIDEO_OPTION) > 0:
+            os.makedirs(self.config.VIDEO_DIR, exist_ok=True)
 
         while (
-            len(stats_episodes) < self.config.test_episode_count
+            len(stats_episodes) < self.config.TEST_EPISODE_COUNT
             and self.envs.num_envs > 0
         ):
             current_episodes = self.envs.current_episodes()
 
             with torch.no_grad():
-                _, actions, _, test_recurrent_hidden_states = self.actor_critic.act(
+                (
+                    _,
+                    actions,
+                    _,
+                    test_recurrent_hidden_states,
+                ) = self.actor_critic.act(
                     batch,
                     test_recurrent_hidden_states,
                     prev_actions,
@@ -501,10 +510,10 @@ class ppoTrainer(BaserlTrainer):
                         )
                     ] = episode_stats
 
-                    if len(self.config.video_option) > 0:
+                    if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
-                            video_option=self.config.video_option,
-                            video_dir=self.config.video_dir,
+                            video_option=self.config.VIDEO_OPTION,
+                            video_dir=self.config.VIDEO_DIR,
                             images=rgb_frames[i],
                             episode_id=current_episodes[i].episode_id,
                             checkpoint_idx=checkpoint_index,
@@ -516,28 +525,28 @@ class ppoTrainer(BaserlTrainer):
                         rgb_frames[i] = []
 
                 # episode continues
-                elif len(self.config.video_option) > 0:
+                elif len(self.config.VIDEO_OPTION) > 0:
                     frame = observations_to_image(observations[i], infos[i])
                     rgb_frames[i].append(frame)
 
-        (
-            self.envs,
-            test_recurrent_hidden_states,
-            not_done_masks,
-            current_episode_reward,
-            prev_actions,
-            batch,
-            rgb_frames,
-        ) = self._pause_envs(
-            envs_to_pause,
-            self.envs,
-            test_recurrent_hidden_states,
-            not_done_masks,
-            current_episode_reward,
-            prev_actions,
-            batch,
-            rgb_frames,
-        )
+            (
+                self.envs,
+                test_recurrent_hidden_states,
+                not_done_masks,
+                current_episode_reward,
+                prev_actions,
+                batch,
+                rgb_frames,
+            ) = self._pause_envs(
+                envs_to_pause,
+                self.envs,
+                test_recurrent_hidden_states,
+                not_done_masks,
+                current_episode_reward,
+                prev_actions,
+                batch,
+                rgb_frames,
+            )
 
         aggregated_stats = dict()
         for stat_key in next(iter(stats_episodes.values())).keys():
