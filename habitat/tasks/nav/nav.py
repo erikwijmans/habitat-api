@@ -776,6 +776,41 @@ class DistanceToGoal(Measure):
         }
 
 
+@registry.register_measure
+class Reachability(Measure):
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+        self._reachability_distance = self._config.reachable
+        self._locations = []
+
+        super().__init__()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "reachability"
+
+    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+        self._locations = [self._sim.get_agent_state().position]
+        self._metric = np.array([1], dtype=np.int64)
+
+    def update_metric(
+        self, *args: Any, episode, action, task: EmbodiedTask, **kwargs: Any
+    ):
+        current_position = self._sim.get_agent_state().position
+        self._locations.append(current_position)
+        distances = np.array(
+            [
+                self._sim.geodesic_distance(current_position, pos)
+                for pos in self._locations
+            ]
+        )
+
+        reachable = distances < self._reachability_distance
+        self._metric = reachable.astype(np.int64) + 1
+
+
 @registry.register_task_action
 class MoveForwardAction(SimulatorTaskAction):
     name: str = "MOVE_FORWARD"

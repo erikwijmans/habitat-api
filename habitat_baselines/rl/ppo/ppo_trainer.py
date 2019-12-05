@@ -153,6 +153,35 @@ class PPOTrainer(BaseRLTrainer):
         episode_counts += 1 - masks
         current_episode_reward *= masks
 
+        for n in range(self.envs.num_envs):
+            reachable = infos[n]["reachability"]
+
+            if dones[n]:
+                self._prev_rollout_end_step[n] = 0
+                self._episode_steps[n] = 0
+                rollouts.observations["reachability"][
+                    rollouts.step + 1, n, rollouts.step + 1
+                ] = 1
+            else:
+                self._episode_steps[n] += 1
+
+                reachable = torch.from_numpy(
+                    reachable[self._prev_rollout_end_step[n] :]
+                ).to(dtype=torch.long, device=self.device)
+
+                rng = slice(
+                    rollouts.step
+                    + 1
+                    - (
+                        self._episode_steps[n] - self._prev_rollout_end_step[n]
+                    ),
+                    rollouts.step + 2,
+                )
+
+                rollouts.observations["reachability"][
+                    rollouts.step + 1, n, rng
+                ] = reachable
+
         rollouts.insert(
             batch,
             recurrent_hidden_states,
@@ -186,6 +215,7 @@ class PPOTrainer(BaseRLTrainer):
 
         value_loss, action_loss, dist_entropy = self.agent.update(rollouts)
 
+        self._prev_rollout_end_step = list(self._episode_steps)
         rollouts.after_update()
 
         return (
@@ -233,7 +263,10 @@ class PPOTrainer(BaseRLTrainer):
         observations = self.envs.reset()
         batch = batch_obs(observations)
 
-        for sensor in rollouts.observations:
+        self._episode_steps = [0 for _ in range(self.envs.num_envs)]
+        self._prev_rollout_end_step = [0 for _ in range(self.envs.num_envs)]
+
+        for sensor in batch:
             rollouts.observations[sensor][0].copy_(batch[sensor])
 
         # batch and observations may contain shared PyTorch CUDA

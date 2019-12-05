@@ -8,6 +8,7 @@ import abc
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from habitat_baselines.common.utils import CategoricalNet, Flatten
 from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
@@ -36,7 +37,7 @@ class Policy(nn.Module):
         masks,
         deterministic=False,
     ):
-        features, rnn_hidden_states = self.net(
+        features, rnn_hidden_states, _ = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
         distribution = self.action_distribution(features)
@@ -52,7 +53,7 @@ class Policy(nn.Module):
         return value, action, action_log_probs, rnn_hidden_states
 
     def get_value(self, observations, rnn_hidden_states, prev_actions, masks):
-        features, _ = self.net(
+        features, _, _ = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
         return self.critic(features)
@@ -60,7 +61,7 @@ class Policy(nn.Module):
     def evaluate_actions(
         self, observations, rnn_hidden_states, prev_actions, masks, action
     ):
-        features, rnn_hidden_states = self.net(
+        features, rnn_hidden_states, aux_loss = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
         distribution = self.action_distribution(features)
@@ -69,7 +70,13 @@ class Policy(nn.Module):
         action_log_probs = distribution.log_probs(action)
         distribution_entropy = distribution.entropy().mean()
 
-        return value, action_log_probs, distribution_entropy, rnn_hidden_states
+        return (
+            value,
+            action_log_probs,
+            distribution_entropy,
+            rnn_hidden_states,
+            aux_loss,
+        )
 
 
 class CriticHead(nn.Module):
@@ -142,6 +149,20 @@ class PointNavBaselineNet(Net):
             self._hidden_size,
         )
 
+        self.classifier = nn.Sequential(
+            nn.Linear(
+                self._hidden_size * 2, self._hidden_size // 2, bias=False
+            ),
+            nn.LayerNorm(self._hidden_size // 2),
+            nn.ReLU(True),
+            nn.Linear(
+                self._hidden_size // 2, self._hidden_size // 2, bias=False
+            ),
+            nn.LayerNorm(self._hidden_size // 2),
+            nn.ReLU(True),
+            nn.Linear(self._hidden_size // 2, 1),
+        )
+
         self.train()
 
     @property
@@ -170,4 +191,53 @@ class PointNavBaselineNet(Net):
         x = torch.cat(x, dim=1)
         x, rnn_hidden_states = self.state_encoder(x, rnn_hidden_states, masks)
 
-        return x, rnn_hidden_states
+        n = rnn_hidden_states.size(1)
+        t = int(x.size(0) / n)
+
+        total_loss = torch.tensor(0.0, device=x.device, dtype=x.dtype)
+        if t > 1:
+
+            def get_logits(mask, reachability, x):
+                valids = mask.nonzero(as_tuple=True)
+
+                if valids[0].numel() <= 2:
+                    return None
+
+                num_samples = valids[0].numel()
+                if num_samples > 256:
+                    inds = torch.randperm(num_samples, device=mask.device)[
+                        0 : int(0.2 * num_samples)
+                    ]
+
+                    valids = tuple(
+                        torch.gather(v, dim=0, index=inds) for v in valids
+                    )
+
+                f1 = x[valids[0], valids[1]]
+                f2 = x[valids[2], valids[1]]
+
+                logits = self.classifier(torch.cat([f1, f2], dim=-1))
+
+                return logits
+
+            reachability = observations["reachability"][:, :t].view(t, n, t)
+            true_logits = get_logits(
+                reachability == 1, reachability, x.view(t, n, -1)
+            )
+            false_logits = get_logits(
+                reachability == 2, reachability, x.view(t, n, -1)
+            )
+
+            if true_logits is not None:
+                total_loss += F.binary_cross_entropy_with_logits(
+                    true_logits, torch.ones_like(true_logits)
+                ) * min(true_logits.numel() / 256.0, 1.0)
+
+            if false_logits is not None:
+                total_loss += F.binary_cross_entropy_with_logits(
+                    false_logits, torch.zeros_like(false_logits)
+                ) * min(false_logits.numel() / 256.0, 1.0)
+
+            total_loss = 0.3 * total_loss
+
+        return x, rnn_hidden_states, total_loss

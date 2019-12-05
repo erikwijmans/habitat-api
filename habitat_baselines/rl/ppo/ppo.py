@@ -86,6 +86,7 @@ class PPO(nn.Module):
                     action_log_probs,
                     dist_entropy,
                     _,
+                    aux_loss,
                 ) = self.actor_critic.evaluate_actions(
                     obs_batch,
                     recurrent_hidden_states_batch,
@@ -126,6 +127,7 @@ class PPO(nn.Module):
                     value_loss * self.value_loss_coef
                     + action_loss
                     - dist_entropy * self.entropy_coef
+                    + aux_loss
                 )
 
                 self.before_backward(total_loss)
