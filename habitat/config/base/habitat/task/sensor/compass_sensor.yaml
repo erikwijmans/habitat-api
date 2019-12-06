@@ -1,3 +1,5 @@
-task:
-  compass_sensor:
-    type: CompassSensor
+habitat:
+  task:
+    sensor:
+      compass_sensor:
+        type: CompassSensor

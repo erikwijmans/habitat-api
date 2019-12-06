@@ -1,5 +1,6 @@
-task:
-  pointgoal_sensor:
-    dimensionality: 2
-    goal_format: polar
-    type: PointGoalSensor
+habitat:
+  task:
+    pointgoal_sensor:
+      dimensionality: 2
+      goal_format: polar
+      type: PointGoalSensor

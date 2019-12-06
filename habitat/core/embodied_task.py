@@ -211,25 +211,27 @@ class EmbodiedTask:
 
         self.measurements = Measurements(
             self._init_entities(
-                entities=config.measure, register_func=registry.get_measure
+                cfg=config.measure, register_func=registry.get_measure
             ).values()
         )
 
         self.sensor_suite = SensorSuite(
             self._init_entities(
-                entities=config.sensor, register_func=registry.get_sensor
+                cfg=config.sensor, register_func=registry.get_sensor
             ).values()
         )
 
         self.actions = self._init_entities(
-            entities=config.action, register_func=registry.get_task_action
+            cfg=config.action,
+            keys=config.action_order,
+            register_func=registry.get_task_action,
         )
         self._action_keys = list(self.actions.keys())
 
-    def _init_entities(self, entities, register_func) -> OrderedDict:
+    def _init_entities(self, cfg, register_func, keys=None) -> OrderedDict:
         entities = OrderedDict()
-        for entity_name in entities:
-            entity_cfg = getattr(entities, entity_name)
+        for entity_name in keys if keys is not None else cfg.keys():
+            entity_cfg = getattr(cfg, entity_name)
             if "type" not in entity_cfg:
                 logger.warn(f"Skipping {entity_name}")
 

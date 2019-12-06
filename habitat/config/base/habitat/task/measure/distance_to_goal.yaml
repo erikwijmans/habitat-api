@@ -1,3 +1,5 @@
-task:
-  distance_to_goal:
-    type: DistanceToGoal
+habitat:
+  measure:
+    task:
+      distance_to_goal:
+        type: DistanceToGoal

@@ -1,3 +1,5 @@
-task:
-  episode_info:
-    type: EpisodeInfo
+habitat:
+  measure:
+    task:
+      episode_info:
+        type: EpisodeInfo

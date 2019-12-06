@@ -1,4 +1,5 @@
-task:
-  gps_sensor:
-    dimensionality: 2
-    type: GPSSensor
+habitat:
+  task:
+    gps_sensor:
+      dimensionality: 2
+      type: GPSSensor

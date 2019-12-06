@@ -1,3 +1,4 @@
-task:
-  correct_answer:
-    type: CorrectAnswer
+habitat:
+  task:
+    correct_answer:
+      type: CorrectAnswer

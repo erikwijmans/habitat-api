@@ -1,3 +1,0 @@
-pyrobot:
-  bump_sensor:
-    type: PyRobotBumpSensor

@@ -1,3 +1,4 @@
-task:
-  heading_sensor:
-    type: HeadingSensor
+habitat:
+  task:
+    heading_sensor:
+      type: HeadingSensor

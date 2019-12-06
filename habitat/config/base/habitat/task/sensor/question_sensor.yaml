@@ -1,3 +1,4 @@
-task:
-  question_sensor:
-    type: QuestionSensor
+habitat:
+  task:
+    question_sensor:
+      type: QuestionSensor

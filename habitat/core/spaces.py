@@ -23,6 +23,9 @@ class EmptySpace(Space):
     def contains(self, x):
         return False
 
+    def __repr__(self):
+        return "EmptySpace()"
+
 
 class ActionSpace(gym.spaces.Dict):
     """

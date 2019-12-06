@@ -1,9 +1,0 @@
-pyrobot:
-  depth_sensor:
-    center_crop: false
-    height: 480
-    max_depth: 5.0
-    min_depth: 0.0
-    normalize_depth: true
-    type: PyRobotDepthSensor
-    width: 640

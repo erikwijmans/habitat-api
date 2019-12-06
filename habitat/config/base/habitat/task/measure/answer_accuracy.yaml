@@ -1,3 +1,5 @@
-task:
-  answer_accuracy:
-    type: AnswerAccuracy
+habitat:
+  measure:
+    task:
+      answer_accuracy:
+        type: AnswerAccuracy
