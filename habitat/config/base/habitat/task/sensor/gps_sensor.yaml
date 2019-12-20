@@ -1,5 +1,6 @@
 habitat:
   task:
-    gps_sensor:
-      dimensionality: 2
-      type: GPSSensor
+    sensor:
+      gps_sensor:
+        dimensionality: 2
+        type: GPSSensor

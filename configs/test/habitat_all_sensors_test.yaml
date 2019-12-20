@@ -1,31 +1,13 @@
-environment:
-  max_episode_steps: 10
-  iterator_options:
-    shuffle: False
-simulator:
-  agent_0:
-    sensors: ['rgb_sensor', 'depth_sensor']
-  rgb_sensor:
-    width: 256
-    height: 256
-  depth_sensor:
-    width: 256
-    height: 256
-dataset:
-  type: PointNav-v1
-  split: train
-  data_path: data/datasets/pointnav/habitat-test-scenes/v1/{split}/{split}.json.gz
-task:
-  type: Nav-v0
-  success_distance: 0.2
-  sensors: ['pointgoal_with_gps_compass_sensor']
-  possible_actions: ['stop', 'move_forward', 'turn_left', 'turn_right', 'teleport']
-  pointgoal_with_gps_compass_sensor:
-    goal_format: "polar"
-    dimensionality: 2
-  goal_sensor_uuid: pointgoal_with_gps_compass
+defaults:
+  - habitat/simulator/sensor: rgb_sensor
+  - habitat/simulator/sensor: depth_sensor
 
-  measurements: ['SPL']
-  SPL:
-    type: SPL
-    success_distance: 0.2
+  - habitat/task/action: stop
+  - habitat/task/action: move_forward
+  - habitat/task/action: turn_left
+  - habitat/task/action: turn_right
+
+
+habitat:
+  task:
+    type: Nav-v0

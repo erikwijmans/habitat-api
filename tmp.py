@@ -2,7 +2,12 @@ import habitat
 
 cfg = habitat.get_config(
     "configs/tasks/pointnav.yaml",
-    ["habitat.task.measure.spl.success_distance=0.5"],
+    [
+        "habitat.task.measure.spl.success_distance=0.5",
+        "habitat/task/sensor=compass_sensor",
+        "habitat/task/sensor=gps_sensor",
+        "habitat.task.sensor.gps_sensor.dimensionality=2",
+    ],
 )
 
 print(cfg.pretty())

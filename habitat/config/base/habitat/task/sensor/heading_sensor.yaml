@@ -1,4 +1,5 @@
 habitat:
   task:
-    heading_sensor:
-      type: HeadingSensor
+    sensor:
+      heading_sensor:
+        type: HeadingSensor

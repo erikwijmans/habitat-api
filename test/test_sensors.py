@@ -46,18 +46,15 @@ def _random_episode(env, config):
 
 
 def test_state_sensors():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    test_sensors = ["heading_sensor", "compass_sensor", "gps_sensor"]
+    config = get_config(
+        "configs/test/habitat_all_sensors_test.yaml",
+        [f"habitat/task/sensor={s}" for s in test_sensors],
+    )
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    with omegaconf.read_write(config):
-        config.task.sensors = [
-            "heading_sensor",
-            "compass_sensor",
-            "gps_sensor",
-        ]
-
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
     env.reset()
     random.seed(123)
     np.random.seed(123)
@@ -74,7 +71,7 @@ def test_state_sensors():
             [
                 NavigationEpisode(
                     episode_id="0",
-                    scene_id=config.simulator.scene,
+                    scene_id=config.habitat.simulator.scene,
                     start_position=[03.00611, 0.072447, -2.67867],
                     start_rotation=random_rotation,
                     goals=[],
@@ -92,14 +89,14 @@ def test_state_sensors():
 
 
 def test_tactile():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    config = get_config(
+        "configs/test/habitat_all_sensors_test.yaml",
+        "habitat/task/sensor=proximity_sensor",
+    )
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    with omegaconf.read_write(config):
-        config.task.sensors = ["proximity_sensor"]
-
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
     env.reset()
     random.seed(1234)
 
@@ -117,14 +114,14 @@ def test_tactile():
 
 
 def test_collisions():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    config = get_config(
+        "configs/test/habitat_all_sensors_test.yaml",
+        "habitat/task/measure=collisions",
+    )
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    with omegaconf.read_write(config):
-        config.task.measurements = ["collisions"]
-
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
     env.reset()
 
     for _ in range(20):
@@ -160,16 +157,18 @@ def test_collisions():
 
 
 def test_pointgoal_sensor():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    config = get_config(
+        None,
+        [
+            "habitat/task/sensor=pointgoal_sensor",
+            "habitat.task.sensor.pointgoal_sensor.dimensionality=3",
+            "habitat.task.sensor.pointgoal_sensor.goal_format=cartesian",
+        ],
+    )
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    with omegaconf.read_write(config):
-        config.task.sensors = ["pointgoal_sensor"]
-        config.task.pointgoal_sensor.dimensionality = 3
-        config.task.pointgoal_sensor.goal_format = "cartesian"
-
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
 
     # start position is checked for validity for the specific test scene
     valid_start_position = [-1.3731, 0.08431, 8.60692]
@@ -203,8 +202,8 @@ def test_pointgoal_sensor():
 
 
 def test_pointgoal_with_gps_compass_sensor():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    config = get_config("configs/test/habitat_all_sensors_test.yaml")
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     with omegaconf.read_write(config):
@@ -222,7 +221,7 @@ def test_pointgoal_with_gps_compass_sensor():
 
         config.task.gps_sensor.dimensionality = 3
 
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
 
     # start position is checked for validity for the specific test scene
     valid_start_position = [-1.3731, 0.08431, 8.60692]
@@ -267,15 +266,15 @@ def test_pointgoal_with_gps_compass_sensor():
 
 
 def test_get_observations_at():
-    config = get_config()
-    if not os.path.exists(config.simulator.scene):
+    config = get_config("configs/test/habitat_all_sensors_test.yaml")
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     with omegaconf.read_write(config):
         config.task.sensors = []
         config.simulator.agent_0.sensors = ["rgb_sensor", "depth_sensor"]
 
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
 
     # start position is checked for validity for the specific test scene
     valid_start_position = [-1.3731, 0.08431, 8.60692]

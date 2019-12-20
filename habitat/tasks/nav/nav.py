@@ -51,8 +51,7 @@ def merge_sim_episode_config(
         episode.start_position is not None
         and episode.start_rotation is not None
     ):
-        agent_name = sim_config.agents[sim_config.default_agent_id]
-        agent_cfg = getattr(sim_config, agent_name)
+        agent_cfg = sim_config.agent[f"agent_{sim_config.default_agent_id}"]
         with omegaconf.read_write(agent_cfg):
             agent_cfg.start_position = episode.start_position
             agent_cfg.start_rotation = episode.start_rotation
@@ -854,7 +853,7 @@ class TeleportAction(SimulatorTaskAction):
         *args: Any,
         position: List[float],
         rotation: List[float],
-        **kwargs: Any
+        **kwargs: Any,
     ):
         r"""Update ``_metric``, this method is called from ``Env`` on each
         ``step``.

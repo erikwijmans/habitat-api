@@ -219,7 +219,7 @@ class HabitatSim(Simulator):
 
     def _update_agents_state(self) -> bool:
         is_updated = False
-        for agent_id, _ in enumerate(self.config.agents):
+        for agent_id in range(len(self.config.agent)):
             agent_cfg = self._get_agent_config(agent_id)
             if agent_cfg.is_set_start_state:
                 self.set_agent_state(

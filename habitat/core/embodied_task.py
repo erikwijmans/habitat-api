@@ -14,6 +14,7 @@ import numpy as np
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
+from habitat.core.logging import logger
 from habitat.core.registry import registry
 from habitat.core.simulator import Observations, SensorSuite, Simulator
 from habitat.core.spaces import ActionSpace, EmptySpace, Space
@@ -211,18 +212,19 @@ class EmbodiedTask:
 
         self.measurements = Measurements(
             self._init_entities(
-                cfg=config.measure, register_func=registry.get_measure
+                cfg=config.get("measure", {}),
+                register_func=registry.get_measure,
             ).values()
         )
 
         self.sensor_suite = SensorSuite(
             self._init_entities(
-                cfg=config.sensor, register_func=registry.get_sensor
+                cfg=config.get("sensor", {}), register_func=registry.get_sensor
             ).values()
         )
 
         self.actions = self._init_entities(
-            cfg=config.action,
+            cfg=config.get("action", {}),
             keys=config.action_order,
             register_func=registry.get_task_action,
         )

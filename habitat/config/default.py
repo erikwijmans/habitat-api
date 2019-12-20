@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import glob
+import inspect
 import os
 import os.path as osp
 from typing import List, Optional, Union
@@ -16,10 +17,12 @@ from hydra._internal.hydra import GlobalHydra
 
 
 def get_config(
-    config_file: Optional[str] = None, overrides: Optional[List[str]] = None
+    config_file: Optional[str] = None,
+    overrides: Optional[Union[List[str], str]] = None,
 ):
     if not GlobalHydra().is_initialized():
-        hydra.experimental.initialize(caller_stack_depth=2)
+        stack = inspect.stack()
+        hydra.experimental.initialize(caller_stack_depth=len(stack))
 
     if not any(
         path.provider == "habitat"
@@ -31,8 +34,11 @@ def get_config(
 
     action_order = []
     cfg = hydra.experimental.compose("habitat_base.yaml", [])
+    defaults = None
     if config_file is not None:
-        extended_cfg_defaults = hydra.experimental.compose(config_file, [])
+        extended_cfg_defaults = hydra.experimental.compose(
+            config_file, overrides=[]
+        )
         extended_cfg_overrides = omegaconf.OmegaConf.load(config_file)
         if "defaults" in extended_cfg_overrides:
             defaults = extended_cfg_overrides.defaults
@@ -48,11 +54,14 @@ def get_config(
         cfg = omegaconf.OmegaConf.merge(cfg, extended_cfg_overrides)
 
     if overrides is not None:
-        cfg = omegaconf.OmegaConf.merge(
-            cfg, omegaconf.OmegaConf.from_dotlist(overrides)
-        )
+        if isinstance(overrides, str):
+            overrides = [overrides]
+
+        overrides_cfg = hydra.experimental.compose(None, overrides)
+        cfg = omegaconf.OmegaConf.merge(cfg, overrides_cfg)
 
     cfg.habitat.task.action_order = omegaconf.ListConfig(action_order)
+    assert len(cfg.habitat.task.action) == len(action_order)
     omegaconf.OmegaConf.set_struct(cfg, True)
     omegaconf.OmegaConf.set_readonly(cfg, True)
 

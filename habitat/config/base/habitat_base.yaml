@@ -8,7 +8,6 @@ defaults:
 habitat:
   seed: 100
 
-
   dataset: ???
 
   task:
