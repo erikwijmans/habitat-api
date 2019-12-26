@@ -36,7 +36,7 @@ def _random_episode(env, config):
         [
             NavigationEpisode(
                 episode_id="0",
-                scene_id=config.simulator.scene,
+                scene_id=config.habitat.simulator.scene,
                 start_position=random_location,
                 start_rotation=random_rotation,
                 goals=[],
@@ -139,7 +139,7 @@ def test_collisions():
             loc = env.sim.get_agent_state().position
             if (
                 np.linalg.norm(loc - prev_loc)
-                < 0.9 * config.simulator.forward_step_size
+                < 0.9 * config.habitat.simulator.forward_step_size
                 and action["action"] == MoveForwardAction.name
             ):
                 # Check to see if the new method of doing collisions catches
@@ -158,7 +158,7 @@ def test_collisions():
 
 def test_pointgoal_sensor():
     config = get_config(
-        None,
+        "configs/test/habitat_all_sensors_test.yaml",
         [
             "habitat/task/sensor=pointgoal_sensor",
             "habitat.task.sensor.pointgoal_sensor.dimensionality=3",
@@ -183,7 +183,7 @@ def test_pointgoal_sensor():
         [
             NavigationEpisode(
                 episode_id="0",
-                scene_id=config.simulator.scene,
+                scene_id=config.habitat.simulator.scene,
                 start_position=valid_start_position,
                 start_rotation=start_rotation,
                 goals=[NavigationGoal(position=goal_position)],
@@ -202,24 +202,33 @@ def test_pointgoal_sensor():
 
 
 def test_pointgoal_with_gps_compass_sensor():
-    config = get_config("configs/test/habitat_all_sensors_test.yaml")
+    config = get_config(
+        "configs/test/habitat_all_sensors_test.yaml",
+        [
+            f"habitat/task/sensor={s}"
+            for s in [
+                "pointgoal_with_gps_compass_sensor",
+                "compass_sensor",
+                "gps_sensor",
+                "pointgoal_sensor",
+            ]
+        ],
+    )
     if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     with omegaconf.read_write(config):
-        config.task.sensors = [
-            "pointgoal_with_gps_compass_sensor",
-            "compass_sensor",
-            "gps_sensor",
-            "pointgoal_sensor",
-        ]
-        config.task.pointgoal_with_gps_compass_sensor.dimensionality = 3
-        config.task.pointgoal_with_gps_compass_sensor.goal_format = "cartesian"
+        config.habitat.task.sensor.pointgoal_with_gps_compass_sensor.dimensionality = (
+            3
+        )
+        config.habitat.task.sensor.pointgoal_with_gps_compass_sensor.goal_format = (
+            "cartesian"
+        )
 
-        config.task.pointgoal_sensor.dimensionality = 3
-        config.task.pointgoal_sensor.goal_format = "cartesian"
+        config.habitat.task.sensor.pointgoal_sensor.dimensionality = 3
+        config.habitat.task.sensor.pointgoal_sensor.goal_format = "cartesian"
 
-        config.task.gps_sensor.dimensionality = 3
+        config.habitat.task.sensor.gps_sensor.dimensionality = 3
 
     env = habitat.Env(config=config.habitat, dataset=None)
 
@@ -236,7 +245,7 @@ def test_pointgoal_with_gps_compass_sensor():
         [
             NavigationEpisode(
                 episode_id="0",
-                scene_id=config.simulator.scene,
+                scene_id=config.habitat.simulator.scene,
                 start_position=valid_start_position,
                 start_rotation=start_rotation,
                 goals=[NavigationGoal(position=goal_position)],
@@ -270,10 +279,6 @@ def test_get_observations_at():
     if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    with omegaconf.read_write(config):
-        config.task.sensors = []
-        config.simulator.agent_0.sensors = ["rgb_sensor", "depth_sensor"]
-
     env = habitat.Env(config=config.habitat, dataset=None)
 
     # start position is checked for validity for the specific test scene
@@ -289,7 +294,7 @@ def test_get_observations_at():
         [
             NavigationEpisode(
                 episode_id="0",
-                scene_id=config.simulator.scene,
+                scene_id=config.habitat.simulator.scene,
                 start_position=valid_start_position,
                 start_rotation=start_rotation,
                 goals=[NavigationGoal(position=goal_position)],

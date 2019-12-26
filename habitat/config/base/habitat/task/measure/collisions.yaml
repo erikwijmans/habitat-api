@@ -1,5 +1,5 @@
 habitat:
-  measure:
-    task:
+  task:
+    measure:
       collisions:
         type: Collisions

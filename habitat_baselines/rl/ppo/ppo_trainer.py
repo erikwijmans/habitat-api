@@ -4,12 +4,16 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import copy
 import os
 import time
 from collections import deque
 from typing import Dict, List
 
+import hydra
 import numpy as np
+import omegaconf
+import pydash
 import torch
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -53,13 +57,13 @@ class PPOTrainer(BaseRLTrainer):
         Returns:
             None
         """
-        logger.add_filehandler(self.config.LOG_FILE)
+        logger.add_filehandler(self.baselines_cfg.logging.file)
 
         self.actor_critic = PointNavBaselinePolicy(
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
             hidden_size=ppo_cfg.hidden_size,
-            goal_sensor_uuid=self.config.TASK_CONFIG.TASK.GOAL_SENSOR_UUID,
+            goal_sensor_uuid=self.config.habitat.task.goal_sensor_uuid,
         )
         self.actor_critic.to(self.device)
 
@@ -89,7 +93,10 @@ class PPOTrainer(BaseRLTrainer):
             "config": self.config,
         }
         torch.save(
-            checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
+            checkpoint,
+            os.path.join(
+                self.baselines_cfg.logging.checkpoint_folder, file_name
+            ),
         )
 
     def load_checkpoint(self, checkpoint_path: str, *args, **kwargs) -> Dict:
@@ -203,17 +210,18 @@ class PPOTrainer(BaseRLTrainer):
         """
 
         self.envs = construct_envs(
-            self.config, get_env_class(self.config.ENV_NAME)
+            self.config, get_env_class(self.baselines_cfg.env.name)
         )
 
-        ppo_cfg = self.config.RL.PPO
+        ppo_cfg = self.baselines_cfg.trainer.ppo
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)
             if torch.cuda.is_available()
             else torch.device("cpu")
         )
-        if not os.path.isdir(self.config.CHECKPOINT_FOLDER):
-            os.makedirs(self.config.CHECKPOINT_FOLDER)
+        os.makedirs(
+            self.baselines_cfg.logging.checkpoint_folder, exist_ok=True
+        )
         self._setup_actor_critic_agent(ppo_cfg)
         logger.info(
             "agent number of parameters: {}".format(
@@ -256,19 +264,19 @@ class PPOTrainer(BaseRLTrainer):
 
         lr_scheduler = LambdaLR(
             optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: linear_decay(x, self.config.NUM_UPDATES),
+            lr_lambda=lambda x: linear_decay(x, ppo_cfg.num_updates),
         )
 
         with TensorboardWriter(
-            self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
+            self.baselines_cfg.tensorboard.dir, flush_secs=self.flush_secs
         ) as writer:
-            for update in range(self.config.NUM_UPDATES):
+            for update in range(ppo_cfg.num_updates):
                 if ppo_cfg.use_linear_lr_decay:
                     lr_scheduler.step()
 
                 if ppo_cfg.use_linear_clip_decay:
                     self.agent.clip_param = ppo_cfg.clip_param * linear_decay(
-                        update, self.config.NUM_UPDATES
+                        update, ppo_cfg.num_updates
                     )
 
                 for step in range(ppo_cfg.num_steps):
@@ -323,7 +331,10 @@ class PPOTrainer(BaseRLTrainer):
                 )
 
                 # log stats
-                if update > 0 and update % self.config.LOG_INTERVAL == 0:
+                if (
+                    update > 0
+                    and update % self.baselines_cfg.logging.interval == 0
+                ):
                     logger.info(
                         "update: {}\tfps: {:.3f}\t".format(
                             update, count_steps / (time.time() - t_start)
@@ -355,7 +366,10 @@ class PPOTrainer(BaseRLTrainer):
                         logger.info("No episodes finish in current window")
 
                 # checkpoint model
-                if update % self.config.CHECKPOINT_INTERVAL == 0:
+                if (
+                    update % self.baselines_cfg.logging.checkpoint_interval
+                    == 0
+                ):
                     self.save_checkpoint(f"ckpt.{count_checkpoints}.pth")
                     count_checkpoints += 1
 
@@ -380,40 +394,45 @@ class PPOTrainer(BaseRLTrainer):
         # Map location CPU is almost always better than mapping to a CUDA device.
         ckpt_dict = self.load_checkpoint(checkpoint_path, map_location="cpu")
 
-        if self.config.EVAL.USE_CKPT_CONFIG:
-            config = self._setup_eval_config(ckpt_dict["config"])
+        if self.baselines_cfg.eval.use_ckpt_config:
+            config = ckpt_dict["config"]
         else:
-            config = self.config.clone()
+            config = copy.deepcopy(self.config)
 
-        ppo_cfg = config.RL.PPO
+        # get name of performance metric, e.g. "spl"
+        self.metric_uuids = []
+        for metric_name in config.habitat.task.measure:
+            metric_cfg = getattr(config.habitat.task.measure, metric_name)
+            measure_init = baseline_registry.get_measure(metric_cfg.type)
+            assert (
+                measure_init is not None
+            ), "invalid measurement type {}".format(metric_cfg.type)
+            self.metric_uuids.append(
+                measure_init(sim=None, task=None, config=None)._get_uuid()
+            )
 
-        config.defrost()
-        config.TASK_CONFIG.DATASET.SPLIT = config.EVAL.SPLIT
-        config.freeze()
+        ppo_cfg = config.habitat_baselines.trainer.ppo
 
-        if len(self.config.VIDEO_OPTION) > 0:
-            config.defrost()
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
-            config.freeze()
+        with omegaconf.read_write(config):
+            config.habitat.dataset.split = config.habitat_baselines.eval.split
+
+        if len(self.baselines_cfg.video.outputs) > 0:
+            extra_measures_cfg = hydra.experimental.compose(
+                overrides=[
+                    "habitat/task/measure=top_down_map",
+                    "habitat/task/measure=collisions",
+                ]
+            )
+            config = omegaconf.OmegaConf.merge(config, extra_measures_cfg)
 
         logger.info(f"env config: {config}")
-        self.envs = construct_envs(config, get_env_class(config.ENV_NAME))
+        self.envs = construct_envs(
+            config, get_env_class(config.habitat_baselines.env.name)
+        )
         self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
         self.actor_critic = self.agent.actor_critic
-
-        # get name of performance metric, e.g. "spl"
-        metric_name = self.config.TASK_CONFIG.TASK.MEASUREMENTS[0]
-        metric_cfg = getattr(self.config.TASK_CONFIG.TASK, metric_name)
-        measure_type = baseline_registry.get_measure(metric_cfg.TYPE)
-        assert measure_type is not None, "invalid measurement type {}".format(
-            metric_cfg.TYPE
-        )
-        self.metric_uuid = measure_type(
-            sim=None, task=None, config=None
-        )._get_uuid()
 
         observations = self.envs.reset()
         batch = batch_obs(observations, self.device)
@@ -424,26 +443,29 @@ class PPOTrainer(BaseRLTrainer):
 
         test_recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
-            self.config.NUM_PROCESSES,
+            self.baselines_cfg.num_processes,
             ppo_cfg.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
-            self.config.NUM_PROCESSES, 1, device=self.device, dtype=torch.long
+            self.baselines_cfg.num_processes,
+            1,
+            device=self.device,
+            dtype=torch.long,
         )
         not_done_masks = torch.zeros(
-            self.config.NUM_PROCESSES, 1, device=self.device
+            self.baselines_cfg.num_processes, 1, device=self.device
         )
         stats_episodes = dict()  # dict of dicts that stores stats per episode
 
         rgb_frames = [
-            [] for _ in range(self.config.NUM_PROCESSES)
+            [] for _ in range(self.baselines_cfg.num_processes)
         ]  # type: List[List[np.ndarray]]
-        if len(self.config.VIDEO_OPTION) > 0:
-            os.makedirs(self.config.VIDEO_DIR, exist_ok=True)
+        if len(self.baselines_cfg.video.outputs) > 0:
+            os.makedirs(self.baselines_cfg.video.dir, exist_ok=True)
 
         while (
-            len(stats_episodes) < self.config.TEST_EPISODE_COUNT
+            len(stats_episodes) < self.baselines_cfg.eval.test_episode_count
             and self.envs.num_envs > 0
         ):
             current_episodes = self.envs.current_episodes()
@@ -494,12 +516,9 @@ class PPOTrainer(BaseRLTrainer):
                 # episode ended
                 if not_done_masks[i].item() == 0:
                     episode_stats = dict()
-                    episode_stats[self.metric_uuid] = infos[i][
-                        self.metric_uuid
-                    ]
-                    episode_stats["success"] = int(
-                        infos[i][self.metric_uuid] > 0
-                    )
+                    for metric_uuid in self.metric_uuids:
+                        episode_stats[metric_uuid] = infos[i][metric_uuid]
+
                     episode_stats["reward"] = current_episode_reward[i].item()
                     current_episode_reward[i] = 0
                     # use scene_id + episode_id as unique id for storing stats
@@ -510,10 +529,10 @@ class PPOTrainer(BaseRLTrainer):
                         )
                     ] = episode_stats
 
-                    if len(self.config.VIDEO_OPTION) > 0:
+                    if len(self.baselines_cfg.video.outputs) > 0:
                         generate_video(
-                            video_option=self.config.VIDEO_OPTION,
-                            video_dir=self.config.VIDEO_DIR,
+                            video_option=self.baselines_cfg.video.outputs,
+                            video_dir=self.baselines_cfg.video.dir,
                             images=rgb_frames[i],
                             episode_id=current_episodes[i].episode_id,
                             checkpoint_idx=checkpoint_index,
@@ -525,7 +544,7 @@ class PPOTrainer(BaseRLTrainer):
                         rgb_frames[i] = []
 
                 # episode continues
-                elif len(self.config.VIDEO_OPTION) > 0:
+                elif len(self.baselines_cfg.video.outputs) > 0:
                     frame = observations_to_image(observations[i], infos[i])
                     rgb_frames[i].append(frame)
 
@@ -556,29 +575,25 @@ class PPOTrainer(BaseRLTrainer):
         num_episodes = len(stats_episodes)
 
         episode_reward_mean = aggregated_stats["reward"] / num_episodes
-        episode_metric_mean = aggregated_stats[self.metric_uuid] / num_episodes
-        episode_success_mean = aggregated_stats["success"] / num_episodes
 
         logger.info(f"Average episode reward: {episode_reward_mean:.6f}")
-        logger.info(f"Average episode success: {episode_success_mean:.6f}")
-        logger.info(
-            f"Average episode {self.metric_uuid}: {episode_metric_mean:.6f}"
-        )
-
         writer.add_scalars(
             "eval_reward",
             {"average reward": episode_reward_mean},
             checkpoint_index,
         )
-        writer.add_scalars(
-            f"eval_{self.metric_uuid}",
-            {f"average {self.metric_uuid}": episode_metric_mean},
-            checkpoint_index,
-        )
-        writer.add_scalars(
-            "eval_success",
-            {"average success": episode_success_mean},
-            checkpoint_index,
-        )
+
+        for metric_uuid in self.metric_uuids:
+            logger.info(
+                f"Average episode {metric_uuid}: {aggregated_stats[metric_uuid]/num_episodes:.6f}"
+            )
+            writer.add_scalars(
+                f"eval_{metric_uuid}",
+                {
+                    f"average {metric_uuid}": aggregated_stats[metric_uuid]
+                    / num_episodes
+                },
+                checkpoint_index,
+            )
 
         self.envs.close()

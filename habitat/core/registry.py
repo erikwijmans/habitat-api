@@ -145,7 +145,11 @@ class Registry(metaclass=Singleton):
 
     @classmethod
     def register_task_action(
-        cls, to_register=None, *, name: Optional[str] = None
+        cls,
+        to_register=None,
+        *,
+        name: Optional[str] = None,
+        priority: int = int(1e8)
     ):
         r"""Add a task action in this registry under key 'name'
 
@@ -154,12 +158,27 @@ class Registry(metaclass=Singleton):
             takes no parameters.
         :param name: Key with which the task action will be registered. If
             :py:`None` will use the name of the task action's method.
+        :param priority: The priority of the action for assigned numeric IDs
+            to action names.
         """
         from habitat.core.embodied_task import Action
 
-        return cls._register_impl(
-            "task_action", to_register, name, assert_type=Action
-        )
+        def wrap(to_register):
+            assert issubclass(
+                to_register, Action
+            ), "{} must be a subclass of {}".format(to_register, Action)
+            register_name = to_register.__name__ if name is None else name
+
+            cls.mapping["task_action"][register_name] = to_register
+            cls.mapping["task_action_priority"][register_name] = priority
+            return to_register
+
+        if to_register is None:
+            return wrap
+        else:
+            return wrap(to_register)
+
+        return ret
 
     @classmethod
     def register_dataset(cls, to_register=None, *, name: Optional[str] = None):
@@ -203,6 +222,10 @@ class Registry(metaclass=Singleton):
     @classmethod
     def get_task_action(cls, name):
         return cls._get_impl("task_action", name)
+
+    @classmethod
+    def get_task_action_priority(cls, name):
+        return cls._get_impl("task_action_priority", name)
 
     @classmethod
     def get_simulator(cls, name):

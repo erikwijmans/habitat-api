@@ -13,8 +13,8 @@ MAX_TEST_STEPS_LIMIT = 3
 def test_overwrite_options():
     for steps_limit in range(MAX_TEST_STEPS_LIMIT):
         config = get_config(
-            config_paths=CFG_TEST,
-            opts=[f"habitat.environment.max_episode_steps={steps_limit}"],
+            CFG_TEST,
+            overrides=f"habitat.environment.max_episode_steps={steps_limit}",
         )
         assert (
             config.habitat.environment.max_episode_steps == steps_limit

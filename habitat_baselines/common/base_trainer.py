@@ -38,7 +38,7 @@ class BaseTrainer:
         raise NotImplementedError
 
 
-class BaserlTrainer(BaseTrainer):
+class BaseRLTrainer(BaseTrainer):
     r"""Base trainer class for rl trainers. Future rl-specific
     methods should be hosted here.
     """
@@ -51,6 +51,7 @@ class BaserlTrainer(BaseTrainer):
         super().__init__()
         assert config is not None, "needs config file to initialize trainer"
         self.config = config
+        self.baselines_cfg = config.habitat_baselines
         self._flush_secs = 30
 
     @property
@@ -72,26 +73,28 @@ class BaserlTrainer(BaseTrainer):
             None
         """
         self.device = (
-            torch.device("cuda", self.config.torch_gpu_id)
+            torch.device("cuda", self.baselines_cfg.torch_gpu_id)
             if torch.cuda.is_available()
             else torch.device("cpu")
         )
 
-        if "tensorboard" in self.config.video_option:
+        if "tensorboard" in self.baselines_cfg.video.outputs:
             assert (
-                len(self.config.tensorboard_dir) > 0
+                len(self.baselines_cfg.tensorboard.dir) > 0
             ), "Must specify a tensorboard directory for video display"
-        if "disk" in self.config.video_option:
+        if "disk" in self.baselines_cfg.video.outputs:
             assert (
-                len(self.config.video_dir) > 0
+                len(self.config.video.dir) > 0
             ), "Must specify a directory for storing videos on disk"
 
         with TensorboardWriter(
-            self.config.tensorboard_dir, flush_secs=self.flush_secs
+            self.baselines_cfg.tensorboard.dir, flush_secs=self.flush_secs
         ) as writer:
-            if os.path.isfile(self.config.eval_ckpt_path_dir):
+            if os.path.isfile(self.baselines_cfg.eval.ckpt_path_dir):
                 # evaluate singe checkpoint
-                self._eval_checkpoint(self.config.eval_ckpt_path_dir, writer)
+                self._eval_checkpoint(
+                    self.baselines_cfg.eval.ckpt_path_dir, writer
+                )
             else:
                 # evaluate multiple checkpoints in order
                 prev_ckpt_ind = -1
@@ -99,7 +102,8 @@ class BaserlTrainer(BaseTrainer):
                     current_ckpt = None
                     while current_ckpt is None:
                         current_ckpt = poll_checkpoint_folder(
-                            self.config.eval_ckpt_path_dir, prev_ckpt_ind
+                            self.baselines_cfg.eval.ckpt_path_dir,
+                            prev_ckpt_ind,
                         )
                         time.sleep(2)  # sleep for 2 secs before polling again
                     logger.info(f"=======current_ckpt: {current_ckpt}=======")

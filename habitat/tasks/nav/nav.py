@@ -776,7 +776,7 @@ class DistanceToGoal(Measure):
         }
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=1)
 class MoveForwardAction(SimulatorTaskAction):
     name: str = "move_forward"
 
@@ -787,7 +787,7 @@ class MoveForwardAction(SimulatorTaskAction):
         return self._sim.step(HabitatSimActions.move_forward)
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=2)
 class TurnLeftAction(SimulatorTaskAction):
     def step(self, *args: Any, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
@@ -796,7 +796,7 @@ class TurnLeftAction(SimulatorTaskAction):
         return self._sim.step(HabitatSimActions.turn_left)
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=3)
 class TurnRightAction(SimulatorTaskAction):
     def step(self, *args: Any, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
@@ -805,7 +805,7 @@ class TurnRightAction(SimulatorTaskAction):
         return self._sim.step(HabitatSimActions.turn_right)
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=0)
 class StopAction(SimulatorTaskAction):
     name: str = "stop"
 
@@ -820,7 +820,7 @@ class StopAction(SimulatorTaskAction):
         return self._sim.get_observations_at()
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=4)
 class LookUpAction(SimulatorTaskAction):
     def step(self, *args: Any, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
@@ -829,7 +829,7 @@ class LookUpAction(SimulatorTaskAction):
         return self._sim.step(HabitatSimActions.look_up)
 
 
-@registry.register_task_action
+@registry.register_task_action(priority=5)
 class LookDownAction(SimulatorTaskAction):
     def step(self, *args: Any, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each

@@ -32,7 +32,7 @@ def get_default_config():
     return c
 
 
-class ppoAgent(Agent):
+class PPOAgent(Agent):
     def __init__(self, config: Config):
         self.goal_sensor_uuid = config.goal_sensor_uuid
         spaces = {
@@ -160,7 +160,7 @@ def main():
     agent_config.MODEL_PATH = args.model_path
     agent_config.goal_sensor_uuid = config.task.goal_sensor_uuid
 
-    agent = ppoAgent(agent_config)
+    agent = PPOAgent(agent_config)
     benchmark = habitat.Benchmark(config_paths=args.task_config)
     metrics = benchmark.evaluate(agent)
 

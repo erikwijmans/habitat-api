@@ -8,10 +8,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-EPS_ppo = 1e-5
+EPS_PPO = 1e-5
 
 
-class ppo(nn.Module):
+class PPO(nn.Module):
     def __init__(
         self,
         actor_critic,
@@ -53,7 +53,7 @@ class ppo(nn.Module):
         if not self.use_normalized_advantage:
             return advantages
 
-        return (advantages - advantages.mean()) / (advantages.std() + EPS_ppo)
+        return (advantages - advantages.mean()) / (advantages.std() + EPS_PPO)
 
     def update(self, rollouts):
         advantages = self.get_advantages(rollouts)

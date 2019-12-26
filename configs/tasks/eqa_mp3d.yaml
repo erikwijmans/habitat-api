@@ -1,15 +1,15 @@
 task:
   type: EQA-v0
-  sensors: ['question_sensor']
-  possible_actions: ['move_forward', 'turn_left', 'turn_right', 'answer']
-  measurements: ['episode_info', 'distance_to_goal', 'answer_ACCURACY']
+  sensors: [question_sensor]
+  possible_actions: [move_forward, turn_left, turn_right, answer]
+  measurements: [episode_info, distance_to_goal, answer_ACCURACY]
 
 environment:
   max_episode_steps: 500
 
 simulator:
   agent_0:
-    sensors: ['rgb_sensor']
+    sensors: [rgb_sensor]
   habitat_sim_v0:
     gpu_device_id: 0
   rgb_sensor:
@@ -22,5 +22,5 @@ simulator:
 dataset:
   type: MP3DEQA-v1
   split: train
-  data_path: "data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz"
-  scenes_dir: "data/scene_datasets/"
+  data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
+  scenes_dir: data/scene_datasets/

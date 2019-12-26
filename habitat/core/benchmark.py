@@ -27,7 +27,7 @@ class Benchmark:
         :param config_paths: file to be used for creating the environment
         """
         config_env = get_config(config_paths)
-        self._env = Env(config=config_env)
+        self._env = Env(config=config_env.habitat)
 
     def evaluate(
         self, agent: Agent, num_episodes: Optional[int] = None

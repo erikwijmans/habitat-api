@@ -1,4 +1,7 @@
 import habitat
+import habitat_baselines
+
+habitat_baselines.config.get_config()
 
 cfg = habitat.get_config(
     "configs/tasks/pointnav.yaml",

@@ -14,12 +14,11 @@ try:
     import torch
 
     from habitat_baselines.run import run_exp
-    from habitat_baselines.common.base_trainer import BaserlTrainer
+    from habitat_baselines.common.base_trainer import BaseRLTrainer
     from habitat_baselines.config.default import get_config
 
     baseline_installed = True
 except ImportError as e:
-    print(e)
     baseline_installed = False
 
 
@@ -47,7 +46,7 @@ def test_trainers(test_cfg_path, mode, gpu2gpu):
     run_exp(
         [test_cfg_path, "configs/tasks/pointnav.yaml"],
         mode,
-        [f"simulator.habitat_sim_v0.gpu_gpu={gpu2gpu}"],
+        [f"habitat.simulator.habitat_sim_v0.gpu_gpu={gpu2gpu}"],
     )
 
 
@@ -86,7 +85,7 @@ def __do_pause_test(num_envs, envs_to_pause):
         prev_actions,
         batch,
         rgb_frames,
-    ) = BaserlTrainer._pause_envs(
+    ) = BaseRLTrainer._pause_envs(
         envs_to_pause,
         envs,
         test_recurrent_hidden_states,

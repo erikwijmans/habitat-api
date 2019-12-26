@@ -32,14 +32,16 @@ def get_env_class(env_name: str) -> Type[habitat.RLEnv]:
 @baseline_registry.register_env(name="NavRLEnv")
 class NavRLEnv(habitat.RLEnv):
     def __init__(self, config: Config, dataset: Optional[Dataset] = None):
-        self._rl_config = config.rl
+        self._rl_config = config.habitat_baselines.env.rl
         self._core_env_config = config
 
         self._previous_target_distance = None
         self._previous_action = None
         self._episode_distance_covered = None
-        self._success_distance = self._core_env_config.task.success_distance
-        super().__init__(self._core_env_config, dataset)
+        self._success_distance = (
+            self._core_env_config.habitat.task.success_distance
+        )
+        super().__init__(self._core_env_config.habitat, dataset)
 
     def reset(self):
         self._previous_action = None

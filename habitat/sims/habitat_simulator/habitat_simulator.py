@@ -153,7 +153,7 @@ class HabitatSim(Simulator):
         agent_config = self._get_agent_config()
 
         sim_sensors = []
-        for sensor_name in config.sensor:
+        for sensor_name in config.get("sensor", {}):
             sensor_cfg = getattr(self.config.sensor, sensor_name)
             if "type" not in sensor_cfg:
                 logger.warn(f"Skipping sensor {sensor_name}")

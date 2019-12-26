@@ -15,6 +15,8 @@ import hydra.experimental
 import omegaconf
 from hydra._internal.hydra import GlobalHydra
 
+from habitat.config import get_config as get_hab_config
+
 
 def _load_file(config_file: str):
     extended_cfg_defaults = hydra.experimental.compose(
@@ -38,28 +40,33 @@ def get_config(
         hydra.experimental.initialize(caller_stack_depth=len(stack))
 
     if not any(
-        path.provider == "habitat"
+        path.provider == "habitat_baselines"
         for path in GlobalHydra().hydra.config_loader.config_search_path.config_search_path
     ):
         GlobalHydra().hydra.config_loader.config_search_path.prepend(
-            "habitat", "pkg://habitat.config.base"
+            "habitat_baselines", "pkg://habitat_baselines.config.base"
         )
 
-    cfg = hydra.experimental.compose("habitat_base.yaml", [])
-    if config_paths is not None:
-        if isinstance(config_paths, str):
-            config_paths = [config_paths]
+    cfg = get_hab_config()
 
+    with omegaconf.open_dict(cfg), omegaconf.read_write(cfg):
         cfg = omegaconf.OmegaConf.merge(
-            cfg, *[_load_file(cfg_file) for cfg_file in config_paths]
+            cfg, hydra.experimental.compose("habitat_baselines_base.yaml", [])
         )
+        if config_paths is not None:
+            if isinstance(config_paths, str):
+                config_paths = [config_paths]
 
-    if overrides is not None:
-        if isinstance(overrides, str):
-            overrides = [overrides]
+            cfg = omegaconf.OmegaConf.merge(
+                cfg, *[_load_file(cfg_file) for cfg_file in config_paths]
+            )
 
-        overrides_cfg = hydra.experimental.compose(None, overrides)
-        cfg = omegaconf.OmegaConf.merge(cfg, overrides_cfg)
+        if overrides is not None:
+            if isinstance(overrides, str):
+                overrides = [overrides]
+
+            overrides_cfg = hydra.experimental.compose(None, overrides)
+            cfg = omegaconf.OmegaConf.merge(cfg, overrides_cfg)
 
     omegaconf.OmegaConf.set_struct(cfg, True)
     omegaconf.OmegaConf.set_readonly(cfg, True)

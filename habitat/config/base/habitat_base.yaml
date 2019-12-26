@@ -1,8 +1,8 @@
 defaults:
-  - habitat/simulator: habitat_sim_v0
-  - habitat/agent: agent_0
-  - habitat/dataset: default
-  - habitat/environment: default
+- habitat/simulator: habitat_sim_v0
+- habitat/agent: agent_0
+- habitat/dataset: default
+- habitat/environment: default
 
 
 habitat:
@@ -15,7 +15,6 @@ habitat:
     action: ???
     sensor: ???
     measure: ???
-    action_order: []
 
   simulator: ???
   environment: ???

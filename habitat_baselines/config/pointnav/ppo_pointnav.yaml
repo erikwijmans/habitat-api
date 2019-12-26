@@ -1,18 +1,19 @@
-trainer_name: "ppo"
-env_name: "NavRLEnv"
+trainer_name: ppo
+env_name: NavRLEnv
 simulator_GPU_ID: 0
 torch_gpu_id: 0
+video:
 - disk
 - tensorboard
-tensorboard_dir: "tb"
-video_dir: "video_dir"
+tensorboard_dir: tb
+video_dir: video_dir
 test_episode_count: 2
-eval_ckpt_path_dir: "data/new_checkpoints"
+eval_ckpt_path_dir: data/new_checkpoints
 num_processes: 1
 sensors:
 - rgb_sensor
 - depth_sensor
-checkpoint_folder: "data/new_checkpoints"
+checkpoint_folder: data/new_checkpoints
 num_updates: 10000
 log_interval: 10
 checkpoint_interval: 50
@@ -30,9 +31,9 @@ rl:
     max_grad_norm: 0.5
     num_steps: 128
     hidden_size: 512
-    use_gae: True
+    use_gae: true
     gamma: 0.99
     tau: 0.95
-    use_linear_clip_decay: True
-    use_linear_lr_decay: True
+    use_linear_clip_decay: true
+    use_linear_lr_decay: true
     reward_window_size: 50

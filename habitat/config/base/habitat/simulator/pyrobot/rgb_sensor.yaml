@@ -1,0 +1,8 @@
+habitat:
+  simulator:
+    sensor:
+      rgb_sensor:
+        center_crop: false
+        height: 480
+        type: PyRobotRGBSensor
+        width: 640

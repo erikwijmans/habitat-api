@@ -29,7 +29,9 @@ def make_env_fn(
     Returns:
         env object created according to specification.
     """
-    dataset = make_dataset(config.dataset.type, config=config.dataset)
+    dataset = make_dataset(
+        config.habitat.dataset.type, config=config.habitat.dataset
+    )
     env = env_class(config=config, dataset=dataset)
     env.seed(rank)
     return env
@@ -51,11 +53,11 @@ def construct_envs(
         VectorEnv object created according to specification.
     """
 
-    num_processes = config.num_processes
+    num_processes = config.habitat_baselines.num_processes
     configs = []
     env_classes = [env_class for _ in range(num_processes)]
-    dataset = make_dataset(config.dataset.type)
-    scenes = dataset.get_scenes_to_load(config.dataset)
+    dataset = make_dataset(config.habitat.dataset.type)
+    scenes = dataset.get_scenes_to_load(config.habitat.dataset)
 
     if len(scenes) > 0:
         random.shuffle(scenes)
@@ -76,13 +78,11 @@ def construct_envs(
 
         with omegaconf.read_write(proc_config):
             if len(scenes) > 0:
-                proc_config.dataset.content_scenes = scene_splits[i]
+                proc_config.habitat.dataset.content_scenes = scene_splits[i]
 
-            proc_config.simulator.habitat_sim_v0.gpu_device_id = (
-                config.simulator_gpu_id
+            proc_config.habitat.simulator.habitat_sim_v0.gpu_device_id = (
+                config.habitat_baselines.simulator_gpu_id
             )
-
-            proc_config.simulator.agent_0.sensors = config.sensors
 
         configs.append(proc_config)
 

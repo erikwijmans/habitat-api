@@ -55,32 +55,35 @@ def _load_test_data():
     datasets = []
     for i in range(NUM_ENVS):
         config = get_config(CFG_TEST)
-        if not PointNavDatasetV1.check_config_paths_exist(config.dataset):
+        if not PointNavDatasetV1.check_config_paths_exist(
+            config.habitat.dataset
+        ):
             pytest.skip("Please download Habitat test data to data folder.")
 
         datasets.append(
             habitat.make_dataset(
-                id_dataset=config.dataset.type, config=config.dataset
+                id_dataset=config.habitat.dataset.type,
+                config=config.habitat.dataset,
             )
         )
 
         with omegaconf.read_write(config):
-            config.simulator.scene = datasets[-1].episodes[0].scene_id
-            if not os.path.exists(config.simulator.scene):
+            config.habitat.simulator.scene = datasets[-1].episodes[0].scene_id
+            if not os.path.exists(config.habitat.simulator.scene):
                 pytest.skip(
                     "Please download Habitat test data to data folder."
                 )
 
-        configs.append(config)
+        configs.append(config.habitat)
 
     return configs, datasets
 
 
 def _vec_env_test_fn(configs, datasets, multiprocessing_start_method, gpu2gpu):
     num_envs = len(configs)
-    for cfg in configs:
-        with omegaconf.read_write(cfg):
-            cfg.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
+    for hab_cfg in configs:
+        with omegaconf.read_write(hab_cfg):
+            hab_cfg.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
 
     env_fn_args = tuple(zip(configs, datasets, range(num_envs)))
     envs = habitat.VectorEnv(
@@ -163,17 +166,17 @@ def test_env(gpu2gpu):
         pytest.skip("GPU-GPU requires CUDA")
 
     config = get_config(CFG_TEST)
-    if not os.path.exists(config.simulator.scene):
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     with omegaconf.read_write(config):
-        config.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
+        config.habitat.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
 
-    env = habitat.Env(config=config, dataset=None)
+    env = habitat.Env(config=config.habitat, dataset=None)
     env.episodes = [
         NavigationEpisode(
             episode_id="0",
-            scene_id=config.simulator.scene,
+            scene_id=config.habitat.simulator.scene,
             start_position=[-3.0133917, 0.04623024, 7.3064547],
             start_rotation=[0, 0.163276, 0, 0.98658],
             goals=[
@@ -184,7 +187,7 @@ def test_env(gpu2gpu):
     ]
     env.reset()
 
-    for _ in range(config.environment.max_episode_steps):
+    for _ in range(config.habitat.environment.max_episode_steps):
         env.step(sample_non_stop_action(env.action_space))
 
     # check for steps limit on environment
@@ -221,9 +224,9 @@ def test_rl_vectorized_envs(gpu2gpu):
         pytest.skip("GPU-GPU requires CUDA")
 
     configs, datasets = _load_test_data()
-    for config in configs:
-        with omegaconf.read_write(config):
-            config.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
+    for hab_cfg in configs:
+        with omegaconf.read_write(hab_cfg):
+            hab_cfg.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
 
     num_envs = len(configs)
     env_fn_args = tuple(zip(configs, datasets, range(num_envs)))
@@ -243,7 +246,7 @@ def test_rl_vectorized_envs(gpu2gpu):
         tiled_img = envs.render(mode="rgb_array")
         new_height = int(np.ceil(np.sqrt(NUM_ENVS)))
         new_width = int(np.ceil(float(NUM_ENVS) / new_height))
-        print(f"observations: {observations}")
+
         h, w, c = observations[0]["rgb"].shape
         assert tiled_img.shape == (
             h * new_height,
@@ -265,11 +268,11 @@ def test_rl_env(gpu2gpu):
         pytest.skip("GPU-GPU requires CUDA")
 
     config = get_config(CFG_TEST)
-    if not os.path.exists(config.simulator.scene):
+    if not os.path.exists(config.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     with omegaconf.read_write(config):
-        config.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
+        config.habitat.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
 
     env = DummyRLEnv(config=config, dataset=None)
     env.episodes = [

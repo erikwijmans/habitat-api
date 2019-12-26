@@ -22,10 +22,11 @@ def main():
         help="run type of the experiment (train or eval)",
     )
     parser.add_argument(
-        "--exp-config",
+        "--exp-configs",
         type=str,
         required=True,
         help="path to config yaml containing info about experiment",
+        nargs="+",
     )
     parser.add_argument(
         "opts",
@@ -51,11 +52,12 @@ def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     """
     config = get_config(exp_config, opts)
 
-    random.seed(config.TASK_CONFIG.SEED)
-    np.random.seed(config.TASK_CONFIG.SEED)
+    random.seed(config.habitat.seed)
+    np.random.seed(config.habitat.seed)
 
-    trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
-    assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
+    trainer_name = config.habitat_baselines.trainer.name
+    trainer_init = baseline_registry.get_trainer(trainer_name)
+    assert trainer_init is not None, f"{trainer_name} is not supported"
     trainer = trainer_init(config)
 
     if run_type == "train":

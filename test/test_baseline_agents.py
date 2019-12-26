@@ -6,6 +6,7 @@
 
 import os
 
+import hydra
 import omegaconf
 import pytest
 
@@ -19,7 +20,7 @@ try:
 except ImportError:
     baseline_installed = False
 
-CFG_TEST = "configs/test/habitat_all_sensors_test.yaml"
+CFG_TEST = "configs/tasks/pointnav.yaml"
 
 
 @pytest.mark.skipif(
@@ -28,25 +29,36 @@ CFG_TEST = "configs/test/habitat_all_sensors_test.yaml"
 def test_ppo_agents():
     agent_config = ppo_agents.get_default_config()
     agent_config.MODEL_PATH = ""
-    config_env = habitat.get_config(config_paths=CFG_TEST)
-    if not os.path.exists(config_env.simulator.scene):
+    config_env = habitat.get_config(CFG_TEST)
+    if not os.path.exists(config_env.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     benchmark = habitat.Benchmark(config_paths=CFG_TEST)
 
     for input_type in ["blind", "rgb", "depth", "rgbd"]:
-        with omegaconf.read_write(config_env):
-            config_env.simulator.agent_0.sensors = []
+        with omegaconf.read_write(config_env), omegaconf.open_dict(config_env):
+            if "sensor" in config_env.habitat.simulator:
+                del config_env.habitat.simulator["sensor"]
             if input_type in ["rgb", "rgbd"]:
-                config_env.simulator.agent_0.sensors.append("rgb_sensor")
+                config_env = omegaconf.OmegaConf.merge(
+                    config_env,
+                    hydra.experimental.compose(
+                        overrides=["habitat/simulator/sensor=rgb_sensor"]
+                    ),
+                )
             if input_type in ["depth", "rgbd"]:
-                config_env.simulator.agent_0.sensors.append("depth_sensor")
+                config_env = omegaconf.OmegaConf.merge(
+                    config_env,
+                    hydra.experimental.compose(
+                        overrides=["habitat/simulator/sensor=depth_sensor"]
+                    ),
+                )
 
         del benchmark._env
-        benchmark._env = habitat.Env(config=config_env)
-        agent_config.INPUT_type = input_type
+        benchmark._env = habitat.Env(config=config_env.habitat)
+        agent_config.INPUT_TYPE = input_type
 
-        agent = ppo_agents.ppoAgent(agent_config)
+        agent = ppo_agents.PPOAgent(agent_config)
         habitat.logger.info(benchmark.evaluate(agent, num_episodes=10))
 
 

@@ -225,14 +225,18 @@ class EmbodiedTask:
 
         self.actions = self._init_entities(
             cfg=config.get("action", {}),
-            keys=config.action_order,
             register_func=registry.get_task_action,
         )
-        self._action_keys = list(self.actions.keys())
+        self._action_keys = list(
+            sorted(
+                self.actions.keys(),
+                key=lambda k: (registry.get_task_action_priority(k), k),
+            )
+        )
 
-    def _init_entities(self, cfg, register_func, keys=None) -> OrderedDict:
+    def _init_entities(self, cfg, register_func) -> OrderedDict:
         entities = OrderedDict()
-        for entity_name in keys if keys is not None else cfg.keys():
+        for entity_name in cfg.keys():
             entity_cfg = getattr(cfg, entity_name)
             if "type" not in entity_cfg:
                 logger.warn(f"Skipping {entity_name}")

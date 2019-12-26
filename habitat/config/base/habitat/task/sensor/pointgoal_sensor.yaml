@@ -1,6 +1,7 @@
 habitat:
   task:
-    pointgoal_sensor:
-      dimensionality: 2
-      goal_format: polar
-      type: PointGoalSensor
+    sensor:
+      pointgoal_sensor:
+        dimensionality: 2
+        goal_format: polar
+        type: PointGoalSensor
