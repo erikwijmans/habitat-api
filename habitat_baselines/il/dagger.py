@@ -6,8 +6,9 @@
 
 import copy
 import os
+import random
 import time
-from collections import deque
+from collections import defaultdict, deque
 from typing import Dict, List
 
 import hydra
@@ -15,11 +16,12 @@ import numpy as np
 import omegaconf
 import pydash
 import torch
+import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config, logger
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.base_trainer import BaseRLTrainer
+from habitat_baselines.common.base_trainer import BaseRLTrainer, BaseTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_envs
 from habitat_baselines.common.environments import get_env_class
@@ -30,14 +32,11 @@ from habitat_baselines.common.utils import (
     generate_video,
     linear_decay,
 )
-from habitat_baselines.rl.ppo import PPO, PointNavBaselinePolicy
+from habitat_baselines.rl.ppo import PointNavBaselinePolicy
 
 
-@baseline_registry.register_trainer(name="ppo")
-class PPOTrainer(BaseRLTrainer):
-    r"""Trainer class for PPO algorithm
-    Paper: https://arxiv.org/abs/1707.06347.
-    """
+@baseline_registry.register_trainer(name="dagger")
+class DaggerTrainer(BaseRLTrainer):
     supported_tasks = ["Nav-v0"]
 
     def __init__(self, config=None):
@@ -46,9 +45,11 @@ class PPOTrainer(BaseRLTrainer):
         self.agent = None
         self.envs = None
         if config is not None:
-            logger.info(f"config: {config}")
+            logger.info(f"config: {config.pretty()}")
 
-    def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
+        self.dataset = []
+
+    def _setup_actor_critic_agent(self, dagger_cfg: Config) -> None:
         r"""Sets up actor critic and agent for PPO.
 
         Args:
@@ -67,16 +68,8 @@ class PPOTrainer(BaseRLTrainer):
         )
         self.actor_critic.to(self.device)
 
-        self.agent = PPO(
-            actor_critic=self.actor_critic,
-            clip_param=ppo_cfg.clip_param,
-            ppo_epoch=ppo_cfg.ppo_epoch,
-            num_mini_batch=ppo_cfg.num_mini_batch,
-            value_loss_coef=ppo_cfg.value_loss_coef,
-            entropy_coef=ppo_cfg.entropy_coef,
-            lr=ppo_cfg.lr,
-            eps=ppo_cfg.eps,
-            max_grad_norm=ppo_cfg.max_grad_norm,
+        self.optimizer = torch.optim.Adam(
+            self.actor_critic.parameters(), lr=dagger_cfg.lr
         )
 
     def save_checkpoint(self, file_name: str) -> None:
@@ -112,95 +105,143 @@ class PPOTrainer(BaseRLTrainer):
         """
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    def _collect_rollout_step(
-        self, rollouts, current_episode_reward, episode_rewards, episode_counts
-    ):
-        pth_time = 0.0
-        env_time = 0.0
-
-        t_sample_action = time.time()
-        # sample actions
-        with torch.no_grad():
-            step_observation = {
-                k: v[rollouts.step] for k, v in rollouts.observations.items()
-            }
-
-            (
-                values,
-                actions,
-                actions_log_probs,
-                recurrent_hidden_states,
-            ) = self.actor_critic.act(
-                step_observation,
-                rollouts.recurrent_hidden_states[rollouts.step],
-                rollouts.prev_actions[rollouts.step],
-                rollouts.masks[rollouts.step],
+    def _update_dataset(self, epoch):
+        torch.cuda.empty_cache()
+        if self.envs is None:
+            self.envs = construct_envs(
+                self.config, get_env_class(self.baselines_cfg.env.name)
             )
+        recurrent_hidden_states = torch.zeros(
+            self.actor_critic.net.num_recurrent_layers,
+            self.baselines_cfg.num_processes,
+            self.baselines_cfg.model.hidden_size,
+            device=self.device,
+        )
+        prev_actions = torch.zeros(
+            self.baselines_cfg.num_processes,
+            1,
+            device=self.device,
+            dtype=torch.long,
+        )
+        not_done_masks = torch.zeros(
+            self.baselines_cfg.num_processes, 1, device=self.device
+        )
 
-        pth_time += time.time() - t_sample_action
-
-        t_step_env = time.time()
-
-        outputs = self.envs.step([a[0].item() for a in actions])
-        observations, rewards, dones, infos = [list(x) for x in zip(*outputs)]
-
-        env_time += time.time() - t_step_env
-
-        t_update_stats = time.time()
+        observations = self.envs.reset()
         batch = batch_obs(observations)
-        rewards = torch.tensor(rewards, dtype=torch.float)
-        rewards = rewards.unsqueeze(1)
 
-        masks = torch.tensor(
-            [[0.0] if done else [1.0] for done in dones], dtype=torch.float
+        episodes = []
+        dones = []
+        for i in range(self.envs.num_envs):
+            episodes.append(
+                [
+                    (
+                        observations[i],
+                        prev_actions[i].item(),
+                        batch["oracle_action"][i].item(),
+                    )
+                ]
+            )
+            dones.append(False)
+
+        curr_dataset_size = len(self.dataset)
+        beta = 0.5 ** (epoch - 1)
+        while (
+            len(self.dataset) - curr_dataset_size
+        ) < self.baselines_cfg.trainer.dagger.update_size:
+            with torch.no_grad():
+                (
+                    _,
+                    actions,
+                    _,
+                    recurrent_hidden_states,
+                ) = self.actor_critic.act(
+                    batch,
+                    recurrent_hidden_states,
+                    prev_actions,
+                    not_done_masks,
+                    deterministic=False,
+                )
+
+            for i in range(self.envs.num_envs):
+                episodes[i].append(
+                    (
+                        observations[i],
+                        prev_actions[i].item(),
+                        batch["oracle_action"][i].item(),
+                    )
+                )
+
+                if dones[i]:
+                    ep = episodes[i]
+                    traj_obs = batch_obs(
+                        [step[0] for step in ep], device=torch.device("cpu")
+                    )
+                    del traj_obs["oracle_action"]
+
+                    self.dataset.append(
+                        (
+                            traj_obs,
+                            torch.tensor(
+                                [step[1] for step in ep], dtype=torch.long
+                            ),
+                            torch.tensor(
+                                [step[2] for step in ep], dtype=torch.long
+                            ),
+                        )
+                    )
+
+                    episodes[i] = []
+
+            actions = torch.where(
+                torch.rand_like(actions, dtype=torch.float) < beta,
+                actions,
+                batch["oracle_action"].long(),
+            )
+            prev_actions.copy_(actions)
+
+            outputs = self.envs.step([a[0].item() for a in actions])
+
+            observations, rewards, dones, infos = [
+                list(x) for x in zip(*outputs)
+            ]
+
+            batch = batch_obs(observations, self.device)
+
+        self.envs.close()
+        self.envs = None
+
+        self.dataset.sort(key=lambda v: v[1].size(0))
+
+    def _update_agent(
+        self, observations, prev_actions, corrected_actions, not_done_masks
+    ):
+        self.optimizer.zero_grad()
+
+        recurrent_hidden_states = torch.zeros(
+            self.actor_critic.net.num_recurrent_layers,
+            self.baselines_cfg.trainer.dagger.batch_size,
+            self.baselines_cfg.model.hidden_size,
+            device=self.device,
         )
 
-        current_episode_reward += rewards
-        episode_rewards += (1 - masks) * current_episode_reward
-        episode_counts += 1 - masks
-        current_episode_reward *= masks
-
-        rollouts.insert(
-            batch,
-            recurrent_hidden_states,
-            actions,
-            actions_log_probs,
-            values,
-            rewards,
-            masks,
+        distribution = self.actor_critic.build_distribution(
+            observations, recurrent_hidden_states, prev_actions, not_done_masks
         )
 
-        pth_time += time.time() - t_update_stats
+        logits = distribution.logits
+        mask = corrected_actions != -1
 
-        return pth_time, env_time, self.envs.num_envs
-
-    def _update_agent(self, ppo_cfg, rollouts):
-        t_update_model = time.time()
-        with torch.no_grad():
-            last_observation = {
-                k: v[-1] for k, v in rollouts.observations.items()
-            }
-            next_value = self.actor_critic.get_value(
-                last_observation,
-                rollouts.recurrent_hidden_states[-1],
-                rollouts.prev_actions[-1],
-                rollouts.masks[-1],
-            ).detach()
-
-        rollouts.compute_returns(
-            next_value, ppo_cfg.use_gae, ppo_cfg.gamma, ppo_cfg.tau
+        corrected_actions = corrected_actions[mask]
+        logits = logits[mask.view(-1, 1).expand_as(logits)].view(
+            -1, logits.size(1)
         )
+        loss = F.cross_entropy(logits, corrected_actions)
+        loss.backward()
 
-        value_loss, action_loss, dist_entropy = self.agent.update(rollouts)
+        self.optimizer.step()
 
-        rollouts.after_update()
-
-        return (
-            time.time() - t_update_model,
-            value_loss,
-            action_loss,
-            dist_entropy,
-        )
+        return loss.item()
 
     def train(self) -> None:
         r"""Main method for training PPO.
@@ -213,7 +254,6 @@ class PPOTrainer(BaseRLTrainer):
             self.config, get_env_class(self.baselines_cfg.env.name)
         )
 
-        ppo_cfg = self.baselines_cfg.trainer.ppo
         self.device = (
             torch.device("cuda", self.baselines_cfg.torch_gpu_id)
             if torch.cuda.is_available()
@@ -222,158 +262,108 @@ class PPOTrainer(BaseRLTrainer):
         os.makedirs(
             self.baselines_cfg.logging.checkpoint_folder, exist_ok=True
         )
-        self._setup_actor_critic_agent(ppo_cfg)
+        self._setup_actor_critic_agent(self.baselines_cfg.trainer.dagger)
         logger.info(
             "agent number of parameters: {}".format(
-                sum(param.numel() for param in self.agent.parameters())
+                sum(param.numel() for param in self.actor_critic.parameters())
             )
         )
 
-        rollouts = RolloutStorage(
-            ppo_cfg.num_steps,
-            self.envs.num_envs,
-            self.envs.observation_spaces[0],
-            self.envs.action_spaces[0],
-            self.baselines_cfg.model.hidden_size,
-        )
-        rollouts.to(self.device)
-
-        observations = self.envs.reset()
-        batch = batch_obs(observations)
-
-        for sensor in rollouts.observations:
-            rollouts.observations[sensor][0].copy_(batch[sensor])
-
-        # batch and observations may contain shared PyTorch CUDA
-        # tensors.  We must explicitly clear them here otherwise
-        # they will be kept in memory for the entire duration of training!
-        batch = None
-        observations = None
-
-        episode_rewards = torch.zeros(self.envs.num_envs, 1)
-        episode_counts = torch.zeros(self.envs.num_envs, 1)
-        current_episode_reward = torch.zeros(self.envs.num_envs, 1)
-        window_episode_reward = deque(maxlen=ppo_cfg.reward_window_size)
-        window_episode_counts = deque(maxlen=ppo_cfg.reward_window_size)
-
-        t_start = time.time()
-        env_time = 0
-        pth_time = 0
-        count_steps = 0
-        count_checkpoints = 0
-
-        lr_scheduler = LambdaLR(
-            optimizer=self.agent.optimizer,
-            lr_lambda=lambda x: linear_decay(x, ppo_cfg.num_updates),
-        )
-
         with TensorboardWriter(
-            self.baselines_cfg.tensorboard.dir, flush_secs=self.flush_secs
+            self.baselines_cfg.tensorboard.dir,
+            flush_secs=self.flush_secs,
+            purge_step=0,
         ) as writer:
-            for update in range(ppo_cfg.num_updates):
-                if ppo_cfg.use_linear_lr_decay:
-                    lr_scheduler.step()
+            step_id = 0
+            for epoch in range(self.baselines_cfg.trainer.dagger.epochs):
+                self._update_dataset(epoch)
+                B = self.baselines_cfg.trainer.dagger.batch_size
+                num_steps = len(self.dataset) // B
+                ordering = list(range(num_steps))
+                random.shuffle(ordering)
+                for i in range(num_steps):
+                    observations_batch = defaultdict(list)
+                    prev_actions_batch = []
+                    corrected_actions_batch = []
 
-                if ppo_cfg.use_linear_clip_decay:
-                    self.agent.clip_param = ppo_cfg.clip_param * linear_decay(
-                        update, ppo_cfg.num_updates
+                    idx = ordering[i]
+
+                    # Select the trajectories in a batch.
+                    # Trajectories are selected seqentially to keep things sorted by
+                    # length to minimize
+                    for bid in range(B):
+                        traj = self.dataset[idx * B + bid]
+                        for sensor in traj[0]:
+                            observations_batch[sensor].append(traj[0][sensor])
+
+                        prev_actions_batch.append(traj[1])
+                        corrected_actions_batch.append(traj[2])
+
+                    max_traj_len = max(
+                        ele.size(0) for ele in prev_actions_batch
                     )
-
-                for step in range(ppo_cfg.num_steps):
-                    (
-                        delta_pth_time,
-                        delta_env_time,
-                        delta_steps,
-                    ) = self._collect_rollout_step(
-                        rollouts,
-                        current_episode_reward,
-                        episode_rewards,
-                        episode_counts,
-                    )
-                    pth_time += delta_pth_time
-                    env_time += delta_env_time
-                    count_steps += delta_steps
-
-                (
-                    delta_pth_time,
-                    value_loss,
-                    action_loss,
-                    dist_entropy,
-                ) = self._update_agent(ppo_cfg, rollouts)
-                pth_time += delta_pth_time
-
-                window_episode_reward.append(episode_rewards.clone())
-                window_episode_counts.append(episode_counts.clone())
-
-                losses = [value_loss, action_loss]
-                stats = zip(
-                    ["count", "reward"],
-                    [window_episode_counts, window_episode_reward],
-                )
-                deltas = {
-                    k: (
-                        (v[-1] - v[0]).sum().item()
-                        if len(v) > 1
-                        else v[0].sum().item()
-                    )
-                    for k, v in stats
-                }
-                deltas["count"] = max(deltas["count"], 1.0)
-
-                writer.add_scalar(
-                    "reward", deltas["reward"] / deltas["count"], count_steps
-                )
-
-                writer.add_scalars(
-                    "losses",
-                    {k: l for l, k in zip(losses, ["value", "policy"])},
-                    count_steps,
-                )
-
-                # log stats
-                if (
-                    update > 0
-                    and update % self.baselines_cfg.logging.interval == 0
-                ):
-                    logger.info(
-                        "update: {}\tfps: {:.3f}\t".format(
-                            update, count_steps / (time.time() - t_start)
-                        )
-                    )
-
-                    logger.info(
-                        "update: {}\tenv-time: {:.3f}s\tpth-time: {:.3f}s\t"
-                        "frames: {}".format(
-                            update, env_time, pth_time, count_steps
-                        )
-                    )
-
-                    window_rewards = (
-                        window_episode_reward[-1] - window_episode_reward[0]
-                    ).sum()
-                    window_counts = (
-                        window_episode_counts[-1] - window_episode_counts[0]
-                    ).sum()
-
-                    if window_counts > 0:
-                        logger.info(
-                            "Average window size {} reward: {:3f}".format(
-                                len(window_episode_reward),
-                                (window_rewards / window_counts).item(),
+                    for bid in range(B):
+                        for sensor in observations_batch:
+                            curr = observations_batch[sensor][bid]
+                            observations_batch[sensor][bid] = torch.cat(
+                                [curr]
+                                + [
+                                    curr[0:1]
+                                    for _ in range(max_traj_len - curr.size(0))
+                                ],
+                                dim=0,
                             )
+
+                        curr = prev_actions_batch[bid]
+                        prev_actions_batch[bid] = torch.cat(
+                            [curr]
+                            + [
+                                curr[0:1]
+                                for _ in range(max_traj_len - curr.size(0))
+                            ],
+                            dim=0,
                         )
-                    else:
-                        logger.info("No episodes finish in current window")
 
-                # checkpoint model
-                if (
-                    update % self.baselines_cfg.logging.checkpoint_interval
-                    == 0
-                ):
-                    self.save_checkpoint(f"ckpt.{count_checkpoints}.pth")
-                    count_checkpoints += 1
+                        curr = corrected_actions_batch[bid]
+                        corrected_actions_batch[bid] = torch.cat(
+                            [curr]
+                            + [
+                                curr[0:1].clone().fill_(-1)
+                                for _ in range(max_traj_len - curr.size(0))
+                            ],
+                            dim=0,
+                        )
 
-            self.envs.close()
+                    for sensor in observations_batch:
+                        observations_batch[sensor] = torch.stack(
+                            observations_batch[sensor], dim=1
+                        )
+                        observations_batch[sensor] = (
+                            observations_batch[sensor]
+                            .view(-1, *observations_batch[sensor].size()[2:])
+                            .to(device=self.device)
+                        )
+
+                    prev_actions_batch = torch.stack(
+                        prev_actions_batch, dim=1
+                    ).to(device=self.device)
+                    corrected_actions_batch = torch.stack(
+                        corrected_actions_batch, dim=1
+                    ).to(device=self.device)
+                    not_done_masks = torch.ones_like(
+                        corrected_actions_batch, dtype=torch.float
+                    )
+                    not_done_masks[0] = 0
+
+                    loss = self._update_agent(
+                        observations_batch,
+                        prev_actions_batch.view(-1, 1),
+                        corrected_actions_batch.view(-1),
+                        not_done_masks.view(-1, 1),
+                    )
+
+                    writer.add_scalars("loss", {"train": loss}, step_id)
+                    step_id += 1
 
     def _eval_checkpoint(
         self,

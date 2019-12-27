@@ -1,0 +1,23 @@
+defaults:
+    - habitat_baselines/env: nav_rl
+    - habitat_baselines/model: baseline
+
+
+habitat_baselines:
+    num_processes: 8
+    model:
+        hidden_size: 32
+    trainer:
+        name: dagger
+        dagger:
+            batch_size: 2
+            lr: 1e-3
+            epochs: 120
+            update_size: 1000
+
+
+habitat:
+    task:
+        sensor:
+            oracle_action:
+                type: OracleAction

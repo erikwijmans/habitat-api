@@ -1,0 +1,3 @@
+habitat_baselines:
+  model:
+    hidden_size: 512

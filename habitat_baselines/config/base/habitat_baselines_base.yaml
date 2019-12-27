@@ -5,6 +5,7 @@ habitat_baselines:
 
   trainer: ???
   env: ???
+  model: ???
 
   logging:
     file: train.log

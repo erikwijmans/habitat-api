@@ -9,7 +9,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from habitat_baselines.common.utils import CategoricalNet, Flatten
+from habitat_baselines.common.utils import (
+    CategoricalNet,
+    CustomFixedCategorical,
+    Flatten,
+)
 from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import SimpleCNN
 
@@ -70,6 +74,16 @@ class Policy(nn.Module):
         distribution_entropy = distribution.entropy().mean()
 
         return value, action_log_probs, distribution_entropy, rnn_hidden_states
+
+    def build_distribution(
+        self, observations, rnn_hidden_states, prev_actions, masks
+    ) -> CustomFixedCategorical:
+        features, rnn_hidden_states = self.net(
+            observations, rnn_hidden_states, prev_actions, masks
+        )
+        distribution = self.action_distribution(features)
+
+        return distribution
 
 
 class CriticHead(nn.Module):

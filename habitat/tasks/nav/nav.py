@@ -414,6 +414,38 @@ class ProximitySensor(Sensor):
         )
 
 
+@registry.register_sensor
+class OracleAction(Sensor):
+    r"""Sensor for observing the distance to the closest obstacle
+
+    Args:
+        sim: reference to the simulator for calculating task observations.
+        config: config for the sensor.
+    """
+
+    def __init__(self, sim, config, *args: Any, **kwargs: Any):
+        self._sim = sim
+        super().__init__(config=config)
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "oracle_action"
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any):
+        return SensorTypes.TACTILE
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any):
+        return spaces.Box(low=0.0, high=100, shape=(1,), dtype=np.float)
+
+    def get_observation(
+        self, observations, *args: Any, episode, **kwargs: Any
+    ):
+        oracle = self._sim._sim.make_greedy_follower(goal_radius=0.2)
+        next_action = oracle.next_action_along(
+            np.array(episode.goals[0].position)
+        )
+        return np.array([next_action if next_action is not None else 0])
+
+
 @registry.register_measure
 class SPL(Measure):
     r"""SPL (Success weighted by Path Length)

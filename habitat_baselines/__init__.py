@@ -6,6 +6,7 @@
 
 from habitat_baselines import config
 from habitat_baselines.common.base_trainer import BaseRLTrainer, BaseTrainer
+from habitat_baselines.il import DaggerTrainer
 from habitat_baselines.rl.ppo.ppo_trainer import PPOTrainer, RolloutStorage
 
 __all__ = ["BaseTrainer", "BaseRLTrainer", "PPOTrainer", "RolloutStorage"]
