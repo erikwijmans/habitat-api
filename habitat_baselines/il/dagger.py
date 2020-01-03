@@ -7,16 +7,21 @@
 import copy
 import os
 import random
+import tempfile
 import time
 from collections import defaultdict, deque
 from typing import Dict, List
 
 import hydra
+import lmdb
+import msgpack_numpy
 import numpy as np
 import omegaconf
 import pydash
 import torch
 import torch.nn.functional as F
+import torch.utils.data
+import tqdm
 from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config, logger
@@ -34,6 +39,158 @@ from habitat_baselines.common.utils import (
 )
 from habitat_baselines.rl.ppo import PointNavBaselinePolicy
 
+torch.backends.cudnn.enabled = True
+torch.backends.cudnn.benchmark = True
+
+
+class ObservationsDict(dict):
+    def pin_memory(self):
+        for k, v in self.items():
+            self[k] = v.pin_memory()
+
+        return self
+
+
+def collate_fn(batch):
+    def _pad_helper(t, max_len, fill_val=0):
+        pad_amount = max_len - t.size(0)
+        if pad_amount == 0:
+            return t
+
+        pad = torch.full_like(t[0:1], fill_val).expand(
+            pad_amount, *t.size()[1:]
+        )
+        return torch.cat([t, pad], dim=0)
+
+    transposed = list(zip(*batch))
+
+    observations_batch = list(transposed[0])
+    prev_actions_batch = list(transposed[1])
+    corrected_actions_batch = list(transposed[2])
+    weights_batch = list(transposed[3])
+    B = len(prev_actions_batch)
+
+    new_observations_batch = defaultdict(list)
+    for sensor in observations_batch[0]:
+        for bid in range(B):
+            new_observations_batch[sensor].append(
+                observations_batch[bid][sensor]
+            )
+
+    observations_batch = new_observations_batch
+
+    max_traj_len = max(ele.size(0) for ele in prev_actions_batch)
+    for bid in range(B):
+        for sensor in observations_batch:
+            observations_batch[sensor][bid] = _pad_helper(
+                observations_batch[sensor][bid], max_traj_len, fill_val=1.0
+            )
+
+        prev_actions_batch[bid] = _pad_helper(
+            prev_actions_batch[bid], max_traj_len
+        )
+        corrected_actions_batch[bid] = _pad_helper(
+            corrected_actions_batch[bid], max_traj_len
+        )
+        weights_batch[bid] = _pad_helper(weights_batch[bid], max_traj_len)
+
+    for sensor in observations_batch:
+        observations_batch[sensor] = torch.stack(
+            observations_batch[sensor], dim=1
+        )
+        observations_batch[sensor] = observations_batch[sensor].view(
+            -1, *observations_batch[sensor].size()[2:]
+        )
+
+    prev_actions_batch = torch.stack(prev_actions_batch, dim=1)
+    corrected_actions_batch = torch.stack(corrected_actions_batch, dim=1)
+    weights_batch = torch.stack(weights_batch, dim=1)
+    not_done_masks = torch.ones_like(
+        corrected_actions_batch, dtype=torch.float
+    )
+    not_done_masks[0] = 0
+
+    observations_batch = ObservationsDict(observations_batch)
+
+    return (
+        observations_batch,
+        prev_actions_batch.view(-1, 1),
+        not_done_masks.view(-1, 1),
+        corrected_actions_batch,
+        weights_batch,
+    )
+
+
+class LengthGroupedSampler(torch.utils.data.Sampler):
+    def __init__(self, lengths, batch_size):
+        self.lengths = lengths
+        self.sort_priority = list(range(len(self.lengths)))
+        self.sorted_ordering = list(range(len(self.lengths)))
+
+        self.batch_size = batch_size
+        self.shuffling = list(range(len(self.lengths) // self.batch_size))
+
+    def __iter__(self):
+        random.shuffle(self.sort_priority)
+        self.sorted_ordering.sort(
+            key=lambda k: (int(self.lengths[k] / 1.1), self.sort_priority[k]),
+            reverse=True,
+        )
+        random.shuffle(self.shuffling)
+        for index in self.shuffling:
+            for bid in range(self.batch_size):
+                yield self.sorted_ordering[index * self.batch_size + bid]
+
+    def __len__(self):
+        return len(self.shuffling) * self.batch_size
+
+
+class IWTrajectoryDataset(torch.utils.data.Dataset):
+    def __init__(self, trajectories_env_dir, length, use_iw):
+        super().__init__()
+        self.trajectories_env_dir = trajectories_env_dir
+        self.lmdb_env = None
+        self.length = length
+
+        if use_iw:
+            self.inflec_weights = torch.tensor([1.0, 2.5])
+        else:
+            self.inflec_weights = torch.tensor([1.0, 1.0])
+
+    def __getitem__(self, index):
+        if self.lmdb_env is None:
+            self.lmdb_env = lmdb.open(
+                self.trajectories_env_dir, map_size=1 << 40
+            )
+
+        with self.lmdb_env.begin(buffers=True) as txn:
+            obs, prev_actions, oracle_actions = msgpack_numpy.unpackb(
+                txn.get(str(index).encode()), raw=False
+            )
+
+        for k, v in obs.items():
+            obs[k] = torch.from_numpy(v)
+
+        prev_actions = torch.from_numpy(prev_actions)
+        oracle_actions = torch.from_numpy(oracle_actions)
+
+        inflections = torch.cat(
+            [
+                torch.tensor([1], dtype=torch.long),
+                (oracle_actions[1:] != oracle_actions[:-1]).long(),
+            ]
+        )
+
+        return (
+            obs,
+            prev_actions,
+            oracle_actions,
+            self.inflec_weights[inflections],
+        )
+
+    def __len__(self):
+        return self.length
+
 
 @baseline_registry.register_trainer(name="dagger")
 class DaggerTrainer(BaseRLTrainer):
@@ -42,12 +199,15 @@ class DaggerTrainer(BaseRLTrainer):
     def __init__(self, config=None):
         super().__init__(config)
         self.actor_critic = None
-        self.agent = None
         self.envs = None
         if config is not None:
             logger.info(f"config: {config.pretty()}")
 
-        self.dataset = []
+        self.trajectory_lengths = []
+        slurm_job_id = os.environ.get("SLURM_JOB_ID", 0)
+        self.trajectories_env_dir = (
+            f"/scratch/slurm_tmpdir/{slurm_job_id}/trajectories.lmdb"
+        )
 
     def _setup_actor_critic_agent(self, dagger_cfg: Config) -> None:
         r"""Sets up actor critic and agent for PPO.
@@ -82,7 +242,7 @@ class DaggerTrainer(BaseRLTrainer):
             None
         """
         checkpoint = {
-            "state_dict": self.agent.state_dict(),
+            "state_dict": self.actor_critic.state_dict(),
             "config": self.config,
         }
         torch.save(
@@ -105,7 +265,7 @@ class DaggerTrainer(BaseRLTrainer):
         """
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    def _update_dataset(self, epoch):
+    def _update_dataset(self, data_it):
         torch.cuda.empty_cache()
         if self.envs is None:
             self.envs = construct_envs(
@@ -128,10 +288,11 @@ class DaggerTrainer(BaseRLTrainer):
         )
 
         observations = self.envs.reset()
-        batch = batch_obs(observations)
+        batch = batch_obs(observations, device=self.device)
 
         episodes = []
         dones = []
+        skips = []
         for i in range(self.envs.num_envs):
             episodes.append(
                 [
@@ -143,84 +304,118 @@ class DaggerTrainer(BaseRLTrainer):
                 ]
             )
             dones.append(False)
+            skips.append(False)
 
-        curr_dataset_size = len(self.dataset)
-        beta = 0.5 ** (epoch - 1)
-        while (
-            len(self.dataset) - curr_dataset_size
-        ) < self.baselines_cfg.trainer.dagger.update_size:
-            with torch.no_grad():
-                (
-                    _,
-                    actions,
-                    _,
-                    recurrent_hidden_states,
-                ) = self.actor_critic.act(
-                    batch,
-                    recurrent_hidden_states,
-                    prev_actions,
-                    not_done_masks,
-                    deterministic=False,
-                )
+        beta = self.baselines_cfg.trainer.dagger.p ** data_it
 
-            for i in range(self.envs.num_envs):
-                episodes[i].append(
-                    (
-                        observations[i],
-                        prev_actions[i].item(),
-                        batch["oracle_action"][i].item(),
-                    )
-                )
+        collected_eps = 0
+        with tqdm.tqdm(
+            total=self.baselines_cfg.trainer.dagger.update_size
+        ) as pbar, lmdb.open(
+            self.trajectories_env_dir, map_size=1 << 40
+        ) as lmdb_env, lmdb_env.begin(
+            write=True
+        ) as txn, torch.no_grad():
+            start_id = lmdb_env.stat()["entries"]
+            while (
+                collected_eps < self.baselines_cfg.trainer.dagger.update_size
+            ):
+                for i in range(self.envs.num_envs):
+                    if dones[i] and not skips[i]:
+                        ep = episodes[i]
+                        traj_obs = batch_obs(
+                            [step[0] for step in ep],
+                            device=torch.device("cpu"),
+                        )
+                        del traj_obs["oracle_action"]
+                        for k, v in traj_obs.items():
+                            traj_obs[k] = v.numpy()
 
-                if dones[i]:
-                    ep = episodes[i]
-                    traj_obs = batch_obs(
-                        [step[0] for step in ep], device=torch.device("cpu")
-                    )
-                    del traj_obs["oracle_action"]
-
-                    self.dataset.append(
-                        (
+                        ep = [
                             traj_obs,
-                            torch.tensor(
-                                [step[1] for step in ep], dtype=torch.long
-                            ),
-                            torch.tensor(
-                                [step[2] for step in ep], dtype=torch.long
-                            ),
+                            np.array([step[1] for step in ep], dtype=np.int64),
+                            np.array([step[2] for step in ep], dtype=np.int64),
+                        ]
+                        txn.put(
+                            str(start_id + collected_eps).encode(),
+                            msgpack_numpy.packb(ep, use_bin_type=True),
+                        )
+
+                        self.trajectory_lengths.append(len(ep))
+                        pbar.update()
+                        collected_eps += 1
+
+                    if dones[i]:
+                        episodes[i] = []
+
+                    episodes[i].append(
+                        (
+                            observations[i],
+                            prev_actions[i].item(),
+                            batch["oracle_action"][i].item(),
                         )
                     )
 
-                    episodes[i] = []
+                if beta < 1.0:
+                    (
+                        _,
+                        actions,
+                        _,
+                        recurrent_hidden_states,
+                    ) = self.actor_critic.act(
+                        batch,
+                        recurrent_hidden_states,
+                        prev_actions,
+                        not_done_masks,
+                        deterministic=False,
+                    )
+                    actions = torch.where(
+                        torch.rand_like(actions, dtype=torch.float) < beta,
+                        batch["oracle_action"].long(),
+                        actions,
+                    )
+                else:
+                    actions = batch["oracle_action"].long()
 
-            actions = torch.where(
-                torch.rand_like(actions, dtype=torch.float) < beta,
-                actions,
-                batch["oracle_action"].long(),
-            )
-            prev_actions.copy_(actions)
+                skips = batch["oracle_action"].long() == -1
+                actions = torch.where(
+                    skips, torch.zeros_like(actions), actions
+                )
+                skips = skips.squeeze(-1).to(device="cpu", non_blocking=True)
 
-            outputs = self.envs.step([a[0].item() for a in actions])
+                prev_actions.copy_(actions)
 
-            observations, rewards, dones, infos = [
-                list(x) for x in zip(*outputs)
-            ]
+                outputs = self.envs.step([a[0].item() for a in actions])
 
-            batch = batch_obs(observations, self.device)
+                observations, rewards, dones, infos = [
+                    list(x) for x in zip(*outputs)
+                ]
+
+                not_done_masks = torch.tensor(
+                    [[0.0] if done else [1.0] for done in dones],
+                    dtype=torch.float,
+                    device=self.device,
+                )
+
+                batch = batch_obs(observations, self.device)
 
         self.envs.close()
         self.envs = None
 
-        self.dataset.sort(key=lambda v: v[1].size(0))
-
     def _update_agent(
-        self, observations, prev_actions, corrected_actions, not_done_masks
+        self,
+        observations,
+        prev_actions,
+        not_done_masks,
+        corrected_actions,
+        weights,
     ):
+        T, N = corrected_actions.size()
         self.optimizer.zero_grad()
 
         recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
-            self.baselines_cfg.trainer.dagger.batch_size,
+            N,
             self.baselines_cfg.model.hidden_size,
             device=self.device,
         )
@@ -230,13 +425,12 @@ class DaggerTrainer(BaseRLTrainer):
         )
 
         logits = distribution.logits
-        mask = corrected_actions != -1
+        logits = logits.view(T, N, -1)
 
-        corrected_actions = corrected_actions[mask]
-        logits = logits[mask.view(-1, 1).expand_as(logits)].view(
-            -1, logits.size(1)
+        loss = F.cross_entropy(
+            logits.permute(0, 2, 1), corrected_actions, reduction="none"
         )
-        loss = F.cross_entropy(logits, corrected_actions)
+        loss = ((weights * loss).sum(0) / weights.sum(0)).mean()
         loss.backward()
 
         self.optimizer.step()
@@ -249,15 +443,21 @@ class DaggerTrainer(BaseRLTrainer):
         Returns:
             None
         """
+        os.makedirs(self.trajectories_env_dir, exist_ok=True)
 
-        self.envs = construct_envs(
-            self.config, get_env_class(self.baselines_cfg.env.name)
-        )
+        with lmdb.open(
+            self.trajectories_env_dir, map_size=1 << 40
+        ) as lmdb_env, lmdb_env.begin(write=True) as txn:
+            txn.drop(lmdb_env.open_db())
 
         self.device = (
             torch.device("cuda", self.baselines_cfg.torch_gpu_id)
             if torch.cuda.is_available()
             else torch.device("cpu")
+        )
+
+        self.envs = construct_envs(
+            self.config, get_env_class(self.baselines_cfg.env.name)
         )
         os.makedirs(
             self.baselines_cfg.logging.checkpoint_folder, exist_ok=True
@@ -275,95 +475,70 @@ class DaggerTrainer(BaseRLTrainer):
             purge_step=0,
         ) as writer:
             step_id = 0
-            for epoch in range(self.baselines_cfg.trainer.dagger.epochs):
-                self._update_dataset(epoch)
-                B = self.baselines_cfg.trainer.dagger.batch_size
-                num_steps = len(self.dataset) // B
-                ordering = list(range(num_steps))
-                random.shuffle(ordering)
-                for i in range(num_steps):
-                    observations_batch = defaultdict(list)
-                    prev_actions_batch = []
-                    corrected_actions_batch = []
+            for dagger_it in range(
+                self.baselines_cfg.trainer.dagger.dagger_iters
+            ):
+                self._update_dataset(dagger_it)
+                sampler = LengthGroupedSampler(
+                    self.trajectory_lengths,
+                    self.baselines_cfg.trainer.dagger.batch_size,
+                )
+                dataset = IWTrajectoryDataset(
+                    self.trajectories_env_dir,
+                    len(self.trajectory_lengths),
+                    self.baselines_cfg.trainer.dagger.use_iw,
+                )
+                diter = torch.utils.data.DataLoader(
+                    dataset,
+                    batch_size=self.baselines_cfg.trainer.dagger.batch_size,
+                    shuffle=False,
+                    sampler=sampler,
+                    collate_fn=collate_fn,
+                    pin_memory=False,
+                    drop_last=True,
+                    num_workers=8,
+                )
 
-                    idx = ordering[i]
+                for epoch in tqdm.trange(
+                    self.baselines_cfg.trainer.dagger.epochs
+                ):
+                    for batch in tqdm.tqdm(
+                        diter, total=len(diter), leave=False
+                    ):
+                        (
+                            observations_batch,
+                            prev_actions_batch,
+                            not_done_masks,
+                            corrected_actions_batch,
+                            weights_batch,
+                        ) = batch
+                        observations_batch = {
+                            k: v.to(device=self.device, non_blocking=True)
+                            for k, v in observations_batch.items()
+                        }
 
-                    # Select the trajectories in a batch.
-                    # Trajectories are selected seqentially to keep things sorted by
-                    # length to minimize
-                    for bid in range(B):
-                        traj = self.dataset[idx * B + bid]
-                        for sensor in traj[0]:
-                            observations_batch[sensor].append(traj[0][sensor])
+                        loss = self._update_agent(
+                            observations_batch,
+                            prev_actions_batch.to(
+                                device=self.device, non_blocking=True
+                            ),
+                            not_done_masks.to(
+                                device=self.device, non_blocking=True
+                            ),
+                            corrected_actions_batch.to(
+                                device=self.device, non_blocking=True
+                            ),
+                            weights_batch.to(
+                                device=self.device, non_blocking=True
+                            ),
+                        )
 
-                        prev_actions_batch.append(traj[1])
-                        corrected_actions_batch.append(traj[2])
+                        writer.add_scalar("train_loss", loss, step_id)
+                        step_id += 1
 
-                    max_traj_len = max(
-                        ele.size(0) for ele in prev_actions_batch
+                    self.save_checkpoint(
+                        f"ckpt.{dagger_it * self.baselines_cfg.trainer.dagger.epochs + epoch}.pth"
                     )
-                    for bid in range(B):
-                        for sensor in observations_batch:
-                            curr = observations_batch[sensor][bid]
-                            observations_batch[sensor][bid] = torch.cat(
-                                [curr]
-                                + [
-                                    curr[0:1]
-                                    for _ in range(max_traj_len - curr.size(0))
-                                ],
-                                dim=0,
-                            )
-
-                        curr = prev_actions_batch[bid]
-                        prev_actions_batch[bid] = torch.cat(
-                            [curr]
-                            + [
-                                curr[0:1]
-                                for _ in range(max_traj_len - curr.size(0))
-                            ],
-                            dim=0,
-                        )
-
-                        curr = corrected_actions_batch[bid]
-                        corrected_actions_batch[bid] = torch.cat(
-                            [curr]
-                            + [
-                                curr[0:1].clone().fill_(-1)
-                                for _ in range(max_traj_len - curr.size(0))
-                            ],
-                            dim=0,
-                        )
-
-                    for sensor in observations_batch:
-                        observations_batch[sensor] = torch.stack(
-                            observations_batch[sensor], dim=1
-                        )
-                        observations_batch[sensor] = (
-                            observations_batch[sensor]
-                            .view(-1, *observations_batch[sensor].size()[2:])
-                            .to(device=self.device)
-                        )
-
-                    prev_actions_batch = torch.stack(
-                        prev_actions_batch, dim=1
-                    ).to(device=self.device)
-                    corrected_actions_batch = torch.stack(
-                        corrected_actions_batch, dim=1
-                    ).to(device=self.device)
-                    not_done_masks = torch.ones_like(
-                        corrected_actions_batch, dtype=torch.float
-                    )
-                    not_done_masks[0] = 0
-
-                    loss = self._update_agent(
-                        observations_batch,
-                        prev_actions_batch.view(-1, 1),
-                        corrected_actions_batch.view(-1),
-                        not_done_masks.view(-1, 1),
-                    )
-
-                    writer.add_scalars("loss", {"train": loss}, step_id)
-                    step_id += 1
 
     def _eval_checkpoint(
         self,
@@ -401,8 +576,6 @@ class DaggerTrainer(BaseRLTrainer):
                 measure_init(sim=None, task=None, config=None)._get_uuid()
             )
 
-        ppo_cfg = config.habitat_baselines.trainer.ppo
-
         with omegaconf.read_write(config):
             config.habitat.dataset.split = config.habitat_baselines.eval.split
 
@@ -419,10 +592,9 @@ class DaggerTrainer(BaseRLTrainer):
         self.envs = construct_envs(
             config, get_env_class(config.habitat_baselines.env.name)
         )
-        self._setup_actor_critic_agent(ppo_cfg)
+        self._setup_actor_critic_agent(config.habitat_baselines.trainer.dagger)
 
-        self.agent.load_state_dict(ckpt_dict["state_dict"])
-        self.actor_critic = self.agent.actor_critic
+        self.actor_critic.load_state_dict(ckpt_dict["state_dict"])
 
         observations = self.envs.reset()
         batch = batch_obs(observations, self.device)

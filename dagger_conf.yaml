@@ -1,19 +1,26 @@
 defaults:
     - habitat_baselines/env: nav_rl
     - habitat_baselines/model: baseline
+    - habitat/task/sensor: pointgoal_with_gps_compass_sensor
 
 
 habitat_baselines:
-    num_processes: 8
+    num_processes: 10
     model:
-        hidden_size: 32
+        hidden_size: 512
     trainer:
         name: dagger
         dagger:
-            batch_size: 2
+            batch_size: 5
             lr: 1e-3
-            epochs: 120
-            update_size: 1000
+            dagger_iters: 5
+            epochs: 10
+            update_size: 20000
+            p: 0.75
+            use_iw: true
+
+    eval:
+        test_episode_count: 994
 
 
 habitat:
@@ -21,3 +28,12 @@ habitat:
         sensor:
             oracle_action:
                 type: OracleAction
+                goal_radius: 0.15
+
+            pointgoal_with_gps_compass_sensor:
+                goal_format: cartesian
+                dimensionality: 3
+    environment:
+            iterator_options:
+                max_scene_repeat_steps: -1
+                max_scene_repeat_episodes: 100
