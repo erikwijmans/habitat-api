@@ -92,9 +92,7 @@ def test_mp3d_eqa_dataset():
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
         dataset_config
     ):
-        pytest.skip(
-            "Please download Matterport3D EQA dataset to " "data folder."
-        )
+        pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = mp3d_dataset.Matterport3dDatasetV1(config=dataset_config)
     assert dataset
@@ -110,9 +108,7 @@ def test_mp3d_eqa_sim():
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
         eqa_config.dataset
     ):
-        pytest.skip(
-            "Please download Matterport3D EQA dataset to " "data folder."
-        )
+        pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
         id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
@@ -147,9 +143,7 @@ def test_mp3d_eqa_sim_correspondence():
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
         eqa_config.dataset
     ):
-        pytest.skip(
-            "Please download Matterport3D EQA dataset to " "data folder."
-        )
+        pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
         id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
