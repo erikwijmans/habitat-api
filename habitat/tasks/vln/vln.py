@@ -87,6 +87,4 @@ class VLNTask(NavigationTask):
     Usage example:
         examples/vln_reference_path_follower_example.py
     """
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    pass

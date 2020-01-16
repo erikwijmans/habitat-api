@@ -1,32 +1,53 @@
-ENVIRONMENT:
-  MAX_EPISODE_STEPS: 500
-SIMULATOR:
-  FORWARD_STEP_SIZE: 0.25
-  TURN_ANGLE: 15
-  HABITAT_SIM_V0:
-    GPU_DEVICE_ID: 0
-  RGB_SENSOR:
-    WIDTH: 256
-    HEIGHT: 256
-    HFOV: 90
-    TYPE: HabitatSimRGBSensor
-  DEPTH_SENSOR:
-    WIDTH: 256
-    HEIGHT: 256
-TASK:
-  TYPE: VLN-v0
-  SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR', 'INSTRUCTION_SENSOR']
-  POINTGOAL_WITH_GPS_COMPASS_SENSOR:
-    GOAL_FORMAT: "POLAR"
-    DIMENSIONALITY: 2
-  GOAL_SENSOR_UUID: pointgoal_with_gps_compass
-  INSTRUCTION_SENSOR_UUID: instruction
-  MEASUREMENTS: ['SPL']
-  SPL:
-    TYPE: SPL
-    SUCCESS_DISTANCE: 3.0
-DATASET:
-  TYPE: R2RVLN-v1
-  SPLIT: val_seen
-  DATA_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz"
-  SCENES_DIR: "data/scene_datasets/"
+defaults:
+  - habitat/task/sensor: pointgoal_with_gps_compass_sensor
+  - habitat/task/sensor: instruction_sensor
+
+  - habitat/task/measure: spl
+
+  - habitat/task/action: stop
+  - habitat/task/action: move_forward
+  - habitat/task/action: turn_left
+  - habitat/task/action: turn_right
+
+  - habitat/simulator: habitat_sim_v0
+  - habitat/simulator/sensor: depth_sensor
+  - habitat/simulator/sensor: rgb_sensor
+
+
+habitat:
+  environment:
+    max_episode_steps: 500
+
+  simulator:
+    forward_step_size: 0.25
+    turn_angle: 15
+
+    habitat_sim_v0:
+      gpu_device_id: 0
+
+    sensor:
+      rgb_sensor:
+        width: 256
+        height: 256
+
+      depth_sensor:
+        width: 256
+        height: 256
+  task:
+    type: VLN-v0
+    success_distance: 3.0
+
+    sensor:
+      pointgoal_with_gps_compass_sensor:
+        goal_format: polar
+        dimenstionality: 2
+
+    measure:
+      spl:
+        success_distance: 3.0
+
+  dataset:
+    type: R2RVLN-v1
+    split: val_seen
+    data_path: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz"
+    scenes_dir: "data/scene_datasets/"

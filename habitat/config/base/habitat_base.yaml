@@ -11,6 +11,7 @@ habitat:
   dataset: ???
 
   task:
+    action_order: null
     type: ???
     action: ???
     sensor: ???

@@ -71,12 +71,8 @@ class Env:
             )
         self._episodes = self._dataset.episodes if self._dataset else []
         self._current_episode = None
-        iter_option_dict = {
-            k.lower(): v
-            for k, v in config.environment.iterator_options.items()
-        }
         self._episode_iterator = self._dataset.get_episode_iterator(
-            **iter_option_dict
+            **config.environment.iterator_options
         )
 
         # load the first scene if dataset is present
@@ -139,7 +135,11 @@ class Env:
         assert (
             len(episodes) > 0
         ), "Environment doesn't accept empty episodes list."
-        self._episodes = episodes
+        self._dataset.episodes = episodes
+        self._episodes = self._dataset.episodes
+        self._episode_iterator = self._dataset.get_episode_iterator(
+            **self._config.environment.iterator_options
+        )
 
     @property
     def sim(self) -> Simulator:

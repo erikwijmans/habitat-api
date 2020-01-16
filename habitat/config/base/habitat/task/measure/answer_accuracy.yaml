@@ -1,5 +1,5 @@
 habitat:
-  measure:
-    task:
+  task:
+    measure:
       answer_accuracy:
         type: AnswerAccuracy

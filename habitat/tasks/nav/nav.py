@@ -921,11 +921,6 @@ class TeleportAction(SimulatorTaskAction):
 
 @registry.register_task(name="Nav-v0")
 class NavigationTask(EmbodiedTask):
-    def __init__(
-        self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
-    ) -> None:
-        super().__init__(config=config, sim=sim, dataset=dataset)
-
     def overwrite_sim_config(
         self, sim_config: Any, episode: Type[Episode]
     ) -> Any:

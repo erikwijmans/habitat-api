@@ -1,0 +1,5 @@
+habitat:
+  task:
+    measure:
+      correct_answer:
+        type: CorrectAnswer

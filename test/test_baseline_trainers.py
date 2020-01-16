@@ -10,12 +10,13 @@ from glob import glob
 
 import pytest
 
+from habitat_baselines.common.base_trainer import BaseRLTrainer
+from habitat_baselines.config.default import get_config
+from run import run_exp
+
 try:
     import torch
-
-    from habitat_baselines.run import run_exp
-    from habitat_baselines.common.base_trainer import BaseRLTrainer
-    from habitat_baselines.config.default import get_config
+    import habitat_baselines
 
     baseline_installed = True
 except ImportError as e:

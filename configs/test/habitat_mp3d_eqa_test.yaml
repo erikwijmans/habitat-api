@@ -1,33 +1,47 @@
-task:
-  type: EQA-v0
-  sensors: [question_sensor]
-  possible_actions: [move_forward, turn_left, turn_right, answer]
-  measurements: [episode_info, distance_to_goal, answer_ACCURACY]
+defaults:
+  - habitat/task/sensor: question_sensor
 
-environment:
-  iterator_options:
-    shuffle: false
+  - habitat/task/measure: episode_info
+  - habitat/task/measure: distance_to_goal
+  - habitat/task/measure: answer_accuracy
 
-simulator:
-  scene: data/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb
-  forward_step_size: 0.1
-  turn_angle: 9
-  agent_0:
-    angular_acceleration: 15.7
-    angular_friction: 1.0
-    coefficient_of_restitution: 0.15707963267
-    linear_acceleration: 10.0
-    linear_friction: 1.0
-    sensors: [rgb_sensor, depth_sensor, semantic_sensor]
-  rgb_sensor:
-    height: 512
-    width: 512
-    Hfov: 45
-    position: [0, 1.09, 0]
-    type: HabitatSimRGBSensor
+  - habitat/task/action: move_forward
+  - habitat/task/action: turn_left
+  - habitat/task/action: turn_right
+  - habitat/task/action: answer
 
-dataset:
-  type: MP3DEQA-v1
-  split: val
-  data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
-  scenes_dir: data/scene_datasets/
+  - habitat/simulator: habitat_sim_v0
+  - habitat/simulator/sensor: depth_sensor
+  - habitat/simulator/sensor: rgb_sensor
+  - habitat/simulator/sensor: semantic_sensor
+
+
+habitat:
+  environment:
+    iterator_options:
+      shuffle: False
+
+  simulator:
+    forward_step_size: 0.1
+    turn_angle: 9
+
+    sensor:
+      depth_sensor:
+        width: 256
+        height: 256
+      rgb_sensor:
+        width: 256
+        height: 256
+      semantic_sensor:
+        width: 256
+        height: 256
+
+  task:
+    type: EQA-v0
+
+
+  dataset:
+    type: MP3DEQA-v1
+    split: val
+    data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
+    scenes_dir: data/scene_datasets/

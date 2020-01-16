@@ -274,11 +274,11 @@ def test_rl_env(gpu2gpu):
     with omegaconf.read_write(config):
         config.habitat.simulator.habitat_sim_v0.gpu_gpu = gpu2gpu
 
-    env = DummyRLEnv(config=config, dataset=None)
+    env = DummyRLEnv(config=config.habitat, dataset=None)
     env.episodes = [
         NavigationEpisode(
             episode_id="0",
-            scene_id=config.simulator.scene,
+            scene_id=config.habitat.simulator.scene,
             start_position=[-3.0133917, 0.04623024, 7.3064547],
             start_rotation=[0, 0.163276, 0, 0.98658],
             goals=[
@@ -291,7 +291,7 @@ def test_rl_env(gpu2gpu):
     done = False
     env.reset()
 
-    for _ in range(config.environment.max_episode_steps):
+    for _ in range(config.habitat.environment.max_episode_steps):
         observation, reward, done, info = env.step(
             action=sample_non_stop_action(env.action_space)
         )

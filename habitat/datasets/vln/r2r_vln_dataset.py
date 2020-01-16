@@ -31,8 +31,8 @@ class VLNDatasetV1(Dataset):
     @staticmethod
     def check_config_paths_exist(config: Config) -> bool:
         return os.path.exists(
-            config.DATA_PATH.format(split=config.SPLIT)
-        ) and os.path.exists(config.SCENES_DIR)
+            config.data_path.format(split=config.split)
+        ) and os.path.exists(config.scenes_dir)
 
     @staticmethod
     def get_scenes_to_load(config: Config) -> List[str]:
@@ -54,9 +54,9 @@ class VLNDatasetV1(Dataset):
         if config is None:
             return
 
-        dataset_filename = config.DATA_PATH.format(split=config.SPLIT)
+        dataset_filename = config.data_path.format(split=config.split)
         with gzip.open(dataset_filename, "rt") as f:
-            self.from_json(f.read(), scenes_dir=config.SCENES_DIR)
+            self.from_json(f.read(), scenes_dir=config.scenes_dir)
 
     def from_json(
         self, json_str: str, scenes_dir: Optional[str] = None

@@ -175,7 +175,8 @@ class EQATask(NavigationTask):
         return self.is_valid and self.answer is None
 
 
-@registry.register_task_action
+# Priority to go right after turn_right
+@registry.register_task_action(priority=31)
 class AnswerAction(Action):
     _answer: Optional[str]
     name: str = "answer"

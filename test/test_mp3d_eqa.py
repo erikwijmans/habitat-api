@@ -42,35 +42,6 @@ RGB_EPISODE_MEANS = {
 EPISODES_LIMIT = 6
 
 
-def get_minos_for_sim_eqa_config():
-    _sim_eqa_c = get_config(CFG_TEST)
-    _sim_eqa_c.task_name = "EQA-v0"
-    _sim_eqa_c.dataset = mp3d_dataset.get_default_mp3d_v1_config()
-    _sim_eqa_c.dataset.split = "val"
-    _sim_eqa_c.scene = "data/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
-    _sim_eqa_c.height = 512
-    _sim_eqa_c.width = 512
-    _sim_eqa_c.hfov = "45"
-    _sim_eqa_c.vfov = "45"
-    _sim_eqa_c.sensor_position = [0, 1.09, 0]
-    _sim_eqa_c.forward_step_size = 0.1  # in metres
-    _sim_eqa_c.turn_angle = 9  # in degrees
-    _sim_eqa_c.sim = "Sim-v0"
-
-    # Agent configuration
-    agent_c = _sim_eqa_c.agents[0]
-    agent_c.height = 1.5
-    agent_c.radius = 0.1
-    agent_c.mass = 32.0
-    agent_c.linear_acceleration = 10.0
-    agent_c.angular_acceleration = 5 * 3.14
-    agent_c.linear_friction = 1.0
-    agent_c.angular_friction = 1.0
-    agent_c.coefficient_of_restitution = 0.15707963267
-
-    return _sim_eqa_c
-
-
 def check_json_serializaiton(dataset: habitat.Dataset):
     start_time = time.time()
     json_str = str(dataset.to_json())
@@ -88,7 +59,7 @@ def check_json_serializaiton(dataset: habitat.Dataset):
 
 
 def test_mp3d_eqa_dataset():
-    dataset_config = get_config(CFG_TEST).dataset
+    dataset_config = get_config(CFG_TEST).habitat.dataset
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
         dataset_config
     ):
@@ -106,14 +77,15 @@ def test_mp3d_eqa_sim():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.dataset
+        eqa_config.habitat.dataset
     ):
         pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
-        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
+        id_dataset=eqa_config.habitat.dataset.type,
+        config=eqa_config.habitat.dataset,
     )
-    env = habitat.Env(config=eqa_config, dataset=dataset)
+    env = habitat.Env(config=eqa_config.habitat, dataset=dataset)
     env.episodes = dataset.episodes[:EPISODES_LIMIT]
 
     assert env
@@ -122,16 +94,15 @@ def test_mp3d_eqa_sim():
         obs = env.step(env.task.action_space.sample())
         if not env.episode_over:
             assert "rgb" in obs, "RGB image is missing in observation."
-            assert obs["rgb"].shape[:2] == (
-                eqa_config.simulator.rgb_sensor.height,
-                eqa_config.simulator.rgb_sensor.width,
-            ), (
+            expected_shape = (
+                eqa_config.habitat.simulator.sensor.rgb_sensor.height,
+                eqa_config.habitat.simulator.sensor.rgb_sensor.width,
+                3,
+            )
+
+            assert obs["rgb"].shape == expected_shape, (
                 "Observation resolution {} doesn't correspond to config "
-                "({}, {}).".format(
-                    obs["rgb"].shape[:2],
-                    eqa_config.simulator.rgb_sensor.height,
-                    eqa_config.simulator.rgb_sensor.width,
-                )
+                "({}, {}).".format(obs["rgb"], expected_shape)
             )
 
     env.close()
@@ -141,14 +112,15 @@ def test_mp3d_eqa_sim_correspondence():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.dataset
+        eqa_config.habitat.dataset
     ):
         pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
-        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
+        id_dataset=eqa_config.habitat.dataset.type,
+        config=eqa_config.habitat.dataset,
     )
-    env = habitat.Env(config=eqa_config, dataset=dataset)
+    env = habitat.Env(config=eqa_config.habitat, dataset=dataset)
     env.episodes = [
         episode
         for episode in dataset.episodes
@@ -207,7 +179,12 @@ def test_mp3d_eqa_sim_correspondence():
                 atol=CLOSE_STEP_THRESHOLD * (step_id + 1),
             ), "Agent's path diverges from the shortest path."
 
-            obs = env.step(action=point.action)
+            if point.action == 3:
+                action = dict(action=3, action_args=dict(answer_id=2))
+            else:
+                action = point.action
+
+            obs = env.step(action=action)
 
             if not env.episode_over:
                 rgb_mean += obs["rgb"][:, :, :3].mean()
@@ -215,7 +192,7 @@ def test_mp3d_eqa_sim_correspondence():
         if ep_i < len(RGB_EPISODE_MEANS):
             rgb_mean = rgb_mean / len(episode.shortest_paths[0])
             assert np.isclose(
-                RGB_EPISODE_MEANS[int(episode.episode_id)], rgb_mean
+                RGB_EPISODE_MEANS[int(episode.episode_id)], rgb_mean, rtol=0.3
             ), "RGB output doesn't match the ground truth."
 
         ep_i = (ep_i + 1) % EPISODES_LIMIT
@@ -229,14 +206,15 @@ def test_eqa_task():
     eqa_config = get_config(CFG_TEST)
 
     if not mp3d_dataset.Matterport3dDatasetV1.check_config_paths_exist(
-        eqa_config.dataset
+        eqa_config.habitat.dataset
     ):
         pytest.skip("Please download Matterport3D EQA dataset to data folder.")
 
     dataset = make_dataset(
-        id_dataset=eqa_config.dataset.type, config=eqa_config.dataset
+        id_dataset=eqa_config.habitat.dataset.type,
+        config=eqa_config.habitat.dataset,
     )
-    env = habitat.Env(config=eqa_config, dataset=dataset)
+    env = habitat.Env(config=eqa_config.habitat, dataset=dataset)
     env.episodes = list(
         filter(
             lambda e: int(e.episode_id) in TEST_EPISODE_SET[:EPISODES_LIMIT],

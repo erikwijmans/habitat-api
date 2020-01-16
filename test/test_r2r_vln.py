@@ -39,12 +39,13 @@ def check_json_serializaiton(dataset: habitat.Dataset):
 def test_r2r_vln_dataset():
     vln_config = get_config(CFG_TEST)
     if not r2r_vln_dataset.VLNDatasetV1.check_config_paths_exist(
-        vln_config.DATASET
+        vln_config.habitat.dataset
     ):
         pytest.skip("Please download Matterport3D R2R dataset to data folder.")
 
     dataset = make_dataset(
-        id_dataset=vln_config.DATASET.TYPE, config=vln_config.DATASET
+        id_dataset=vln_config.habitat.dataset.type,
+        config=vln_config.habitat.dataset,
     )
     assert dataset
     assert (
@@ -57,17 +58,18 @@ def test_r2r_vln_sim():
     vln_config = get_config(CFG_TEST)
 
     if not r2r_vln_dataset.VLNDatasetV1.check_config_paths_exist(
-        vln_config.DATASET
+        vln_config.habitat.dataset
     ):
         pytest.skip(
             "Please download Matterport3D R2R VLN dataset to data folder."
         )
 
     dataset = make_dataset(
-        id_dataset=vln_config.DATASET.TYPE, config=vln_config.DATASET
+        id_dataset=vln_config.habitat.dataset.type,
+        config=vln_config.habitat.dataset,
     )
 
-    env = habitat.Env(config=vln_config, dataset=dataset)
+    env = habitat.Env(config=vln_config.habitat, dataset=dataset)
     env.episodes = dataset.episodes[:EPISODES_LIMIT]
 
     follower = ShortestPathFollower(
@@ -96,16 +98,15 @@ def test_r2r_vln_sim():
                     == env.current_episode.instruction.instruction_text
                 ), "Instruction from sensor does not match the intruction from the episode"
 
-                assert obs["rgb"].shape[:2] == (
-                    vln_config.SIMULATOR.RGB_SENSOR.HEIGHT,
-                    vln_config.SIMULATOR.RGB_SENSOR.WIDTH,
-                ), (
+                expected_shape = (
+                    vln_config.habitat.simulator.sensor.rgb_sensor.height,
+                    vln_config.habitat.simulator.sensor.rgb_sensor.width,
+                    3,
+                )
+
+                assert obs["rgb"].shape == expected_shape, (
                     "Observation resolution {} doesn't correspond to config "
-                    "({}, {}).".format(
-                        obs["rgb"].shape[:2],
-                        vln_config.SIMULATOR.RGB_SENSOR.HEIGHT,
-                        vln_config.SIMULATOR.RGB_SENSOR.WIDTH,
-                    )
+                    "({}, {}).".format(obs["rgb"], expected_shape)
                 )
 
     env.close()

@@ -8,6 +8,9 @@ habitat_baselines:
   torch_gpu_id: 0
   num_processes: 1
 
+  model:
+    hidden_size: 128
+
   logging:
     checkpoint_folder: data/test_checkpoints/ppo/pointnav/
     interval: 100

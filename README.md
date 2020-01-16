@@ -87,7 +87,7 @@ import habitat
 
 # Load embodied AI task (PointNav) and a pre-specified virtual robot
 env = habitat.Env(
-    config=habitat.get_config("configs/tasks/pointnav.yaml")
+    config=habitat.get_config("configs/tasks/pointnav.yaml").habitat
 )
 
 observations = env.reset()

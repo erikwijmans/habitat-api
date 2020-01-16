@@ -4,7 +4,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from yacs.config import CfgNode as Config
+from omegaconf.config import Config
 
 from habitat.config.default import get_config
 

@@ -1,0 +1,5 @@
+habitat:
+    task:
+        sensor:
+            instruction_sensor:
+                type: InstructionSensor

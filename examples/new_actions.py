@@ -149,11 +149,11 @@ def main():
     HabitatSimActions.extend_action_space("strafe_left")
     HabitatSimActions.extend_action_space("strafe_right")
 
-    config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
+    config = habitat.get_config(
+        config_paths="configs/tasks/pointnav.yaml"
+    ).habitat
 
     with omegaconf.read_write(config):
-        config.task.possible_actions.append("strafe_left")
-        config.task.possible_actions.append("strafe_right")
 
         with omegaconf.open_dict(config):
             config.task.actions.strafe_left = omegaconf.OmegaConf.create(

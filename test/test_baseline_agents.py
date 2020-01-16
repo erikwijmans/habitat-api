@@ -28,7 +28,7 @@ CFG_TEST = "configs/tasks/pointnav.yaml"
 )
 def test_ppo_agents():
     agent_config = ppo_agents.get_default_config()
-    agent_config.MODEL_PATH = ""
+    agent_config.model_path = ""
     config_env = habitat.get_config(CFG_TEST)
     if not os.path.exists(config_env.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
@@ -43,20 +43,28 @@ def test_ppo_agents():
                 config_env = omegaconf.OmegaConf.merge(
                     config_env,
                     hydra.experimental.compose(
-                        overrides=["habitat/simulator/sensor=rgb_sensor"]
+                        overrides=[
+                            "habitat/simulator/sensor=rgb_sensor",
+                            "habitat.simulator.sensor.rgb_sensor.width=256",
+                            "habitat.simulator.sensor.rgb_sensor.height=256",
+                        ]
                     ),
                 )
             if input_type in ["depth", "rgbd"]:
                 config_env = omegaconf.OmegaConf.merge(
                     config_env,
                     hydra.experimental.compose(
-                        overrides=["habitat/simulator/sensor=depth_sensor"]
+                        overrides=[
+                            "habitat/simulator/sensor=depth_sensor",
+                            "habitat.simulator.sensor.depth_sensor.width=256",
+                            "habitat.simulator.sensor.depth_sensor.height=256",
+                        ]
                     ),
                 )
 
         del benchmark._env
         benchmark._env = habitat.Env(config=config_env.habitat)
-        agent_config.INPUT_TYPE = input_type
+        agent_config.input_type = input_type
 
         agent = ppo_agents.PPOAgent(agent_config)
         habitat.logger.info(benchmark.evaluate(agent, num_episodes=10))
@@ -68,7 +76,7 @@ def test_ppo_agents():
 def test_simple_agents():
     config_env = habitat.get_config(config_paths=CFG_TEST)
 
-    if not os.path.exists(config_env.simulator.scene):
+    if not os.path.exists(config_env.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     benchmark = habitat.Benchmark(config_paths=CFG_TEST)
@@ -80,7 +88,8 @@ def test_simple_agents():
         simple_agents.RandomForwardAgent,
     ]:
         agent = agent_class(
-            config_env.task.success_distance, config_env.task.goal_sensor_uuid
+            config_env.habitat.task.success_distance,
+            config_env.habitat.task.goal_sensor_uuid,
         )
         habitat.logger.info(agent_class.__name__)
         habitat.logger.info(benchmark.evaluate(agent, num_episodes=100))

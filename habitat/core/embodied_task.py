@@ -223,21 +223,41 @@ class EmbodiedTask:
             ).values()
         )
 
+        action_cfg = config.get("action", {})
         self.actions = self._init_entities(
-            cfg=config.get("action", {}),
-            register_func=registry.get_task_action,
+            cfg=action_cfg, register_func=registry.get_task_action
         )
-        self._action_keys = list(
-            sorted(
-                self.actions.keys(),
-                key=lambda k: (registry.get_task_action_priority(k), k),
+        if config.action_order is not None:
+            self._action_keys = config.action_order
+            if len(self._action_keys) != len(self.actions):
+                raise RuntimeError(
+                    "Expected user provided action orders to have the same number of keys as there are actions\n"
+                    f"Got {self._action_keys}\n"
+                    "for {self.actions}"
+                )
+            for k in self._action_keys:
+                if k not in self.actions:
+                    raise RuntimeError(
+                        f"Could not find action for ordering key '{k}'"
+                    )
+        else:
+            self._action_keys = list(
+                sorted(
+                    self.actions.keys(),
+                    key=lambda k: (
+                        registry.get_task_action_priority(
+                            action_cfg.get(k).type
+                        ),
+                        k,
+                    ),
+                )
             )
-        )
 
     def _init_entities(self, cfg, register_func) -> OrderedDict:
         entities = OrderedDict()
         for entity_name in cfg.keys():
-            entity_cfg = getattr(cfg, entity_name)
+            entity_cfg = cfg.get(entity_name)
+
             if "type" not in entity_cfg:
                 logger.warn(f"Skipping {entity_name}")
 

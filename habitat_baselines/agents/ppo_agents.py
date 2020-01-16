@@ -9,6 +9,7 @@ import argparse
 import random
 
 import numpy as np
+import omegaconf
 import torch
 from gym.spaces import Box, Dict, Discrete
 
@@ -21,15 +22,21 @@ from habitat_baselines.rl.ppo import PointNavBaselinePolicy
 
 
 def get_default_config():
-    c = Config()
-    c.INPUT_type = "blind"
-    c.MODEL_PATH = "data/checkpoints/blind.pth"
-    c.RESOLUTION = 256
-    c.HIDDEN_SIZE = 512
-    c.RANDOM_seed = 7
-    c.PTH_GPU_ID = 0
-    c.goal_sensor_uuid = "pointgoal_with_gps_compass"
-    return c
+    cfg = omegaconf.OmegaConf.create(
+        dict(
+            input_type="blind",
+            model_path="data/checkpoints/blind.pth",
+            resolution=256,
+            hidden_size=512,
+            random_seed=7,
+            pth_gpu_id=0,
+            goal_sensor_uuid="pointgoal_with_gps_compass",
+        )
+    )
+
+    omegaconf.OmegaConf.set_struct(cfg, True)
+
+    return cfg
 
 
 class PPOAgent(Agent):
@@ -44,19 +51,19 @@ class PPOAgent(Agent):
             )
         }
 
-        if config.INPUT_type in ["depth", "rgbd"]:
+        if config.input_type in ["depth", "rgbd"]:
             spaces["depth"] = Box(
                 low=0,
                 high=1,
-                shape=(config.RESOLUTION, config.RESOLUTION, 1),
+                shape=(config.resolution, config.resolution, 1),
                 dtype=np.float32,
             )
 
-        if config.INPUT_type in ["rgb", "rgbd"]:
+        if config.input_type in ["rgb", "rgbd"]:
             spaces["rgb"] = Box(
                 low=0,
                 high=255,
-                shape=(config.RESOLUTION, config.RESOLUTION, 3),
+                shape=(config.resolution, config.resolution, 3),
                 dtype=np.uint8,
             )
         observation_spaces = Dict(spaces)
@@ -64,14 +71,14 @@ class PPOAgent(Agent):
         action_spaces = Discrete(4)
 
         self.device = (
-            torch.device("cuda:{}".format(config.PTH_GPU_ID))
+            torch.device("cuda:{}".format(config.pth_gpu_id))
             if torch.cuda.is_available()
             else torch.device("cpu")
         )
-        self.hidden_size = config.HIDDEN_SIZE
+        self.hidden_size = config.hidden_size
 
-        random.seed(config.RANDOM_seed)
-        torch.random.manual_seed(config.RANDOM_seed)
+        random.seed(config.random_seed)
+        torch.random.manual_seed(config.random_seed)
         if torch.cuda.is_available():
             torch.backends.cudnn.deterministic = True
 
@@ -83,8 +90,8 @@ class PPOAgent(Agent):
         )
         self.actor_critic.to(self.device)
 
-        if config.MODEL_PATH:
-            ckpt = torch.load(config.MODEL_PATH, map_location=self.device)
+        if config.model_path:
+            ckpt = torch.load(config.model_path, map_location=self.device)
             #  Filter only actor_critic weights
             self.actor_critic.load_state_dict(
                 {
@@ -156,8 +163,8 @@ def main():
     config = get_config(args.task_config)
 
     agent_config = get_default_config()
-    agent_config.INPUT_type = args.input_type
-    agent_config.MODEL_PATH = args.model_path
+    agent_config.input_type = args.input_type
+    agent_config.model_path = args.model_path
     agent_config.goal_sensor_uuid = config.task.goal_sensor_uuid
 
     agent = PPOAgent(agent_config)

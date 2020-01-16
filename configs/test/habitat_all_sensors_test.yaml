@@ -9,5 +9,7 @@ defaults:
 
 
 habitat:
+  environment:
+    max_episode_steps: 10
   task:
     type: Nav-v0
