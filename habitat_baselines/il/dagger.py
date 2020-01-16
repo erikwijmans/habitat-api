@@ -160,7 +160,10 @@ class IWTrajectoryDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         if self.lmdb_env is None:
             self.lmdb_env = lmdb.open(
-                self.trajectories_env_dir, map_size=1 << 40
+                self.trajectories_env_dir,
+                map_size=1 << 40,
+                write=False,
+                lock=False,
             )
 
         with self.lmdb_env.begin(buffers=True) as txn:
