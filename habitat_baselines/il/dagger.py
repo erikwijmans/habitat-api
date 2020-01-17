@@ -7,9 +7,7 @@
 import copy
 import os
 import random
-import tempfile
-import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from typing import Dict, List
 
 import hydra
@@ -17,26 +15,19 @@ import lmdb
 import msgpack_numpy
 import numpy as np
 import omegaconf
-import pydash
 import torch
 import torch.nn.functional as F
 import torch.utils.data
 import tqdm
-from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config, logger
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.base_trainer import BaseRLTrainer, BaseTrainer
+from habitat_baselines.common.base_trainer import BaseRLTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_envs
 from habitat_baselines.common.environments import get_env_class
-from habitat_baselines.common.rollout_storage import RolloutStorage
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
-from habitat_baselines.common.utils import (
-    batch_obs,
-    generate_video,
-    linear_decay,
-)
+from habitat_baselines.common.utils import batch_obs, generate_video
 from habitat_baselines.rl.ppo import PointNavBaselinePolicy
 
 torch.backends.cudnn.enabled = True
@@ -162,7 +153,7 @@ class IWTrajectoryDataset(torch.utils.data.Dataset):
             self.lmdb_env = lmdb.open(
                 self.trajectories_env_dir,
                 map_size=1 << 40,
-                write=False,
+                readonly=True,
                 lock=False,
             )
 
@@ -293,21 +284,10 @@ class DaggerTrainer(BaseRLTrainer):
         observations = self.envs.reset()
         batch = batch_obs(observations, device=self.device)
 
-        episodes = []
-        dones = []
-        skips = []
-        for i in range(self.envs.num_envs):
-            episodes.append(
-                [
-                    (
-                        observations[i],
-                        prev_actions[i].item(),
-                        batch["oracle_action"][i].item(),
-                    )
-                ]
-            )
-            dones.append(False)
-            skips.append(False)
+        episodes = [[] for _ in range(self.envs.num_envs)]
+        skips = [False for _ in range(self.envs.num_envs)]
+        # Populate dones with False initially
+        dones = [False for _ in range(self.envs.num_envs)]
 
         beta = self.baselines_cfg.trainer.dagger.p ** data_it
 
@@ -334,14 +314,16 @@ class DaggerTrainer(BaseRLTrainer):
                         for k, v in traj_obs.items():
                             traj_obs[k] = v.numpy()
 
-                        ep = [
+                        transposed_ep = [
                             traj_obs,
                             np.array([step[1] for step in ep], dtype=np.int64),
                             np.array([step[2] for step in ep], dtype=np.int64),
                         ]
                         txn.put(
                             str(start_id + collected_eps).encode(),
-                            msgpack_numpy.packb(ep, use_bin_type=True),
+                            msgpack_numpy.packb(
+                                transposed_ep, use_bin_type=True
+                            ),
                         )
 
                         self.trajectory_lengths.append(len(ep))
