@@ -1,47 +1,37 @@
 defaults:
-  - habitat/task/sensor: question_sensor
-
-  - habitat/task/measure: episode_info
-  - habitat/task/measure: distance_to_goal
-  - habitat/task/measure: answer_accuracy
-
-  - habitat/task/action: move_forward
-  - habitat/task/action: turn_left
-  - habitat/task/action: turn_right
-  - habitat/task/action: answer
-
-  - habitat/simulator: habitat_sim_v0
-  - habitat/simulator/sensor: depth_sensor
-  - habitat/simulator/sensor: rgb_sensor
-  - habitat/simulator/sensor: semantic_sensor
-
-
+- habitat/task/sensor: question_sensor
+- habitat/task/measure: episode_info
+- habitat/task/measure: distance_to_goal
+- habitat/task/measure: answer_accuracy
+- habitat/task/action: move_forward
+- habitat/task/action: turn_left
+- habitat/task/action: turn_right
+- habitat/task/action: answer
+- habitat/simulator: habitat_sim_v0
+- habitat/simulator/sensor: depth_sensor
+- habitat/simulator/sensor: rgb_sensor
+- habitat/simulator/sensor: semantic_sensor
 habitat:
-  environment:
-    iterator_options:
-      shuffle: False
-
-  simulator:
-    forward_step_size: 0.1
-    turn_angle: 9
-
-    sensor:
-      depth_sensor:
-        width: 256
-        height: 256
-      rgb_sensor:
-        width: 256
-        height: 256
-      semantic_sensor:
-        width: 256
-        height: 256
-
-  task:
-    type: EQA-v0
-
-
   dataset:
-    type: MP3DEQA-v1
-    split: val
     data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
     scenes_dir: data/scene_datasets/
+    split: val
+    type: MP3DEQA-v1
+  environment:
+    iterator_options:
+      shuffle: false
+  simulator:
+    forward_step_size: 0.1
+    sensor:
+      depth_sensor:
+        height: 256
+        width: 256
+      rgb_sensor:
+        height: 256
+        width: 256
+      semantic_sensor:
+        height: 256
+        width: 256
+    turn_angle: 9
+  task:
+    type: EQA-v0

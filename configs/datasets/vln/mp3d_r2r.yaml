@@ -1,5 +1,5 @@
 DATASET:
-  TYPE: R2RVLN-v1
+  DATA_PATH: data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz
+  SCENES_DIR: data/scene_datasets/
   SPLIT: train
-  DATA_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz"
-  SCENES_DIR: "data/scene_datasets/"
+  TYPE: R2RVLN-v1

@@ -2,5 +2,5 @@ habitat:
   task:
     sensor:
       proximity_sensor:
-        max_detection_radius: 2.0
+        max_detection_radius: 2
         type: ProximitySensor

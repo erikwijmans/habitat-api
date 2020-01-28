@@ -1,4 +1,4 @@
 dataset:
-  type: PointNav-v1
-  split: train
   data_path: data/datasets/pointnav/mp3d/v1/{split}/{split}.json.gz
+  split: train
+  type: PointNav-v1

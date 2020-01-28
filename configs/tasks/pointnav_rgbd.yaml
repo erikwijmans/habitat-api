@@ -2,26 +2,28 @@ environment:
   max_episode_steps: 500
 simulator:
   agent_0:
-    sensors: [rgb_sensor, depth_sensor]
+    sensors:
+    - rgb_sensor
+    - depth_sensor
+  depth_sensor:
+    height: 256
+    width: 256
   habitat_sim_v0:
     gpu_device_id: 0
   rgb_sensor:
-    width: 256
     height: 256
-  depth_sensor:
     width: 256
-    height: 256
 task:
-  type: Nav-v0
-  success_distance: 0.2
-
-  sensors: [pointgoal_with_gps_compass_sensor]
-  pointgoal_with_gps_compass_sensor:
-    goal_format: polar
-    dimensionality: 2
-  goal_sensor_uuid: pointgoal_with_gps_compass
-
-  measurements: [SPL]
   SPL:
-    type: SPL
     success_distance: 0.2
+    type: SPL
+  goal_sensor_uuid: pointgoal_with_gps_compass
+  measurements:
+  - SPL
+  pointgoal_with_gps_compass_sensor:
+    dimensionality: 2
+    goal_format: polar
+  sensors:
+  - pointgoal_with_gps_compass_sensor
+  success_distance: 0.2
+  type: Nav-v0

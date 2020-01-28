@@ -1,47 +1,36 @@
 defaults:
-  - habitat/task/sensor: instruction_sensor
-
-  - habitat/task/measure: spl
-
-  - habitat/task/action: stop
-  - habitat/task/action: move_forward
-  - habitat/task/action: turn_left
-  - habitat/task/action: turn_right
-
-  - habitat/simulator: habitat_sim_v0
-  - habitat/simulator/sensor: depth_sensor
-  - habitat/simulator/sensor: rgb_sensor
-
-
+- habitat/task/sensor: instruction_sensor
+- habitat/task/measure: spl
+- habitat/task/action: stop
+- habitat/task/action: move_forward
+- habitat/task/action: turn_left
+- habitat/task/action: turn_right
+- habitat/simulator: habitat_sim_v0
+- habitat/simulator/sensor: depth_sensor
+- habitat/simulator/sensor: rgb_sensor
 habitat:
+  dataset:
+    data_path: data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz
+    scenes_dir: data/scene_datasets/
+    split: val_seen
+    type: R2RVLN-v1
   environment:
     max_episode_steps: 500
-
   simulator:
     forward_step_size: 0.25
-    turn_angle: 15
-
     habitat_sim_v0:
       gpu_device_id: 0
-
     sensor:
-      rgb_sensor:
-        width: 256
-        height: 256
-
       depth_sensor:
-        width: 256
         height: 256
+        width: 256
+      rgb_sensor:
+        height: 256
+        width: 256
+    turn_angle: 15
   task:
-    type: VLN-v0
-    success_distance: 3.0
-
     measure:
       spl:
-        success_distance: 3.0
-
-  dataset:
-    type: R2RVLN-v1
-    split: val_seen
-    data_path: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}.json.gz"
-    scenes_dir: "data/scene_datasets/"
+        success_distance: 3
+    success_distance: 3
+    type: VLN-v0

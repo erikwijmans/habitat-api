@@ -1,16 +1,13 @@
 defaults:
 - habitat/simulator/sensor: rgb_sensor
 - habitat/simulator/sensor: depth_sensor
-
 - habitat/task/action: stop
 - habitat/task/action: move_forward
 - habitat/task/action: turn_left
 - habitat/task/action: turn_right
-
-
 habitat:
   environment:
     max_episode_steps: 100
   task:
-    type: Nav-v0
     success_distance: 0.2
+    type: Nav-v0

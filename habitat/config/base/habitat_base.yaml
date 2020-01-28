@@ -3,19 +3,14 @@ defaults:
 - habitat/agent: agent_0
 - habitat/dataset: default
 - habitat/environment: default
-
-
 habitat:
-  seed: 100
-
   dataset: ???
-
-  task:
-    action_order: null
-    type: ???
-    action: ???
-    sensor: ???
-    measure: ???
-
-  simulator: ???
   environment: ???
+  seed: 100
+  simulator: ???
+  task:
+    action: ???
+    action_order: null
+    measure: ???
+    sensor: ???
+    type: ???

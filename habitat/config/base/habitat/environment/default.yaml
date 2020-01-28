@@ -1,8 +1,5 @@
 habitat:
   environment:
-    max_episode_seconds: 10000000
-    max_episode_steps: 1000
-
     iterator_options:
       cycle: true
       group_by_scene: true
@@ -11,3 +8,5 @@ habitat:
       num_episode_sample: -1
       shuffle: true
       step_repetition_range: 0.2
+    max_episode_seconds: 10000000
+    max_episode_steps: 1000

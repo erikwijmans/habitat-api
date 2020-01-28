@@ -2,39 +2,28 @@ defaults:
 - habitat_baselines/trainer: ppo
 - habitat_baselines/env: nav_rl
 - habitat_baselines/model: baseline
-
-
 habitat:
   environment:
     max_episode_steps: 50
-
-
 habitat_baselines:
-  simulator_gpu_id: 0
-  torch_gpu_id: 0
-  num_processes: 1
-
-  model:
-    hidden_size: 128
-
-  logging:
-    checkpoint_folder: data/test_checkpoints/ppo/pointnav/
-    interval: 100
-    checkpoint_interval: 1
-
   eval:
     ckpt_path_dir: data/test_checkpoints/ppo/pointnav/ckpt.0.pth
-
-  video:
-    outputs: []
-
+  logging:
+    checkpoint_folder: data/test_checkpoints/ppo/pointnav/
+    checkpoint_interval: 1
+    interval: 100
+  model:
+    hidden_size: 128
+  num_processes: 1
+  simulator_gpu_id: 0
   tensorborad:
-    dir: ''
-
+    dir: ""
+  torch_gpu_id: 0
   trainer:
     ppo:
-      ppo_epoch: 2
       num_mini_batch: 1
       num_steps: 32
-
       num_updates: 5
+      ppo_epoch: 2
+  video:
+    outputs: []

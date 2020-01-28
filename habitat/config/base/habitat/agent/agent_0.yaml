@@ -3,13 +3,20 @@ habitat:
     agent:
       agent_0:
         angular_acceleration: 12.56
-        angular_friction: 1.0
-        coefficient_of_restitution: 0.0
+        angular_friction: 1
+        coefficient_of_restitution: 0
         height: 1.5
         is_set_start_state: false
-        linear_acceleration: 20.0
+        linear_acceleration: 20
         linear_friction: 0.5
-        mass: 32.0
+        mass: 32
         radius: 0.1
-        start_position: [0, 0, 0]
-        start_rotation: [0, 0, 0, 1]
+        start_position:
+        - 0
+        - 0
+        - 0
+        start_rotation:
+        - 0
+        - 0
+        - 0
+        - 1

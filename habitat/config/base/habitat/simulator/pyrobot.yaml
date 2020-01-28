@@ -1,6 +1,5 @@
 habtat:
   simulator:
-    type: PyRobot-v0
-
-    sensor: ???
     action: ???
+    sensor: ???
+    type: PyRobot-v0

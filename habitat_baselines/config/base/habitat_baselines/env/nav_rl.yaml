@@ -1,7 +1,6 @@
 habitat_baselines:
   env:
     name: NavRLEnv
-
     rl:
       slack_reward: -0.01
-      success_reward: 10.0
+      success_reward: 10

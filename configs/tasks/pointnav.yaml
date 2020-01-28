@@ -1,41 +1,31 @@
 defaults:
 - habitat/simulator/sensor: depth_sensor
 - habitat/simulator/sensor: rgb_sensor
-
 - habitat/task/sensor: pointgoal_with_gps_compass_sensor
-
 - habitat/task/measure: spl
-
 - habitat/task/action: stop
 - habitat/task/action: move_forward
 - habitat/task/action: turn_left
 - habitat/task/action: turn_right
-
-
 habitat:
   environment:
     max_episode_steps: 500
-
   simulator:
     sensor:
-      rgb_sensor:
-        width: 256
-        height: 256
       depth_sensor:
-        width: 256
         height: 256
-
+        width: 256
+      rgb_sensor:
+        height: 256
+        width: 256
   task:
-    type: Nav-v0
-
-    sensor:
-      pointgoal_with_gps_compass_sensor:
-        goal_format: polar
-        dimensionality: 2
-
+    goal_sensor_uuid: pointgoal_with_gps_compass
     measure:
       spl:
         success_distance: 0.2
-
-    goal_sensor_uuid: pointgoal_with_gps_compass
+    sensor:
+      pointgoal_with_gps_compass_sensor:
+        dimensionality: 2
+        goal_format: polar
     success_distance: 0.2
+    type: Nav-v0

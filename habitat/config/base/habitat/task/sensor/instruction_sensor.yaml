@@ -1,5 +1,5 @@
 habitat:
-    task:
-        sensor:
-            instruction_sensor:
-                type: InstructionSensor
+  task:
+    sensor:
+      instruction_sensor:
+        type: InstructionSensor

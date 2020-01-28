@@ -1,28 +1,32 @@
-
-
-task:
-  type: EQA-v0
-  sensors: [question_sensor]
-  possible_actions: [move_forward, turn_left, turn_right, answer]
-  measurements: [episode_info, distance_to_goal, answer_ACCURACY]
-
+dataset:
+  data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
+  scenes_dir: data/scene_datasets/
+  split: train
+  type: MP3DEQA-v1
 environment:
   max_episode_steps: 500
-
 simulator:
   agent_0:
-    sensors: [rgb_sensor]
+    sensors:
+    - rgb_sensor
+  depth_sensor:
+    height: 256
+    width: 256
   habitat_sim_v0:
     gpu_device_id: 0
   rgb_sensor:
-    width: 256
     height: 256
-  depth_sensor:
     width: 256
-    height: 256
-
-dataset:
-  type: MP3DEQA-v1
-  split: train
-  data_path: data/datasets/eqa/mp3d/v1/{split}/{split}.json.gz
-  scenes_dir: data/scene_datasets/
+task:
+  measurements:
+  - episode_info
+  - distance_to_goal
+  - answer_ACCURACY
+  possible_actions:
+  - move_forward
+  - turn_left
+  - turn_right
+  - answer
+  sensors:
+  - question_sensor
+  type: EQA-v0

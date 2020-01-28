@@ -2,27 +2,19 @@ defaults:
 - habitat_baselines/trainer: ppo
 - habitat_baselines/env: nav_rl
 - habitat_baselines/model: baseline
-
-
 habitat_baselines:
-  simulator_gpu_id: 0
-  torch_gpu_id: 0
-  num_processes: 4
-
   logging:
     checkpoint_folder: data/checkpoints/ppo/pointnav/
-    interval: 25
     checkpoint_interval: 200
-
-
-  video:
-    outputs: []
-
+    interval: 25
+  num_processes: 4
+  simulator_gpu_id: 0
   tensorborad:
-    dir: 'tb/pointnav'
-
-
+    dir: tb/pointnav
+  torch_gpu_id: 0
   trainer:
     ppo:
       num_mini_batch: 2
       num_updates: 100000
+  video:
+    outputs: []
