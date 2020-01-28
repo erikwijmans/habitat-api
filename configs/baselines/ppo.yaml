@@ -1,4 +1,0 @@
-TRAINER:
-  rl:
-    success_reward: 10.0
-    slack_reward: -0.01

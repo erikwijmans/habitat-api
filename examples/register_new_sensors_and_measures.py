@@ -82,22 +82,17 @@ def main():
         # Add things to the config to for the measure
         # The type field is used to look-up the measure in the registry.
         # By default, the things are registered with the class name
-        config.task.episode_info_example = omegaconf.OmegaConf.create(
+        config.habitat.task.measure.episode_info_example = omegaconf.OmegaConf.create(
             dict(type="EpisodeInfoExample", value=5)
         )
 
-        # Add the measure to the list of measures in use
-        config.task.measurements.append("episode_info")
-
         # Now define the config for the sensor
         # Use the custom name
-        config.task.agent_position_sensor = omegaconf.OmegaConf.create(
+        config.habitat.task.sensor.agent_position_sensor = omegaconf.OmegaConf.create(
             dict(type="my_supercool_sensor", answer_to_life=42)
         )
-        # Add the sensor to the list of sensors in use
-        config.task.sensors.append("agent_position_sensor")
 
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     print(env.reset()["agent_position"])
     print(env.get_metrics()["episode_info"])
     print(env.step("move_forward")["agent_position"])

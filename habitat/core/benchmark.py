@@ -21,12 +21,14 @@ class Benchmark:
     r"""Benchmark for evaluating agents in environments.
     """
 
-    def __init__(self, config_paths: Optional[str] = None) -> None:
+    def __init__(
+        self, config_paths: Optional[str] = None, overrides=None
+    ) -> None:
         r"""..
 
         :param config_paths: file to be used for creating the environment
         """
-        config_env = get_config(config_paths)
+        config_env = get_config(config_paths, overrides)
         self._env = Env(config=config_env.habitat)
 
     def evaluate(

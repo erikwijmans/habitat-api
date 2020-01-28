@@ -1,6 +1,12 @@
 defaults:
 - habitat_baselines/trainer: ppo
 - habitat_baselines/env: nav_rl
+- habitat_baselines/model: baseline
+
+
+habitat:
+  environment:
+    max_episode_steps: 50
 
 
 habitat_baselines:
@@ -27,6 +33,8 @@ habitat_baselines:
 
   trainer:
     ppo:
+      ppo_epoch: 2
       num_mini_batch: 1
+      num_steps: 32
 
-      num_updates: 10
+      num_updates: 5

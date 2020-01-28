@@ -19,11 +19,11 @@ TELEPORT_ROTATION = [0.92035, 0, -0.39109465, 0]
 
 
 def test_task_actions():
-    config = habitat.get_config(config_paths=CFG_TEST)
-    with omegaconf.read_write(config):
-        config.task.possible_actions.append("teleport")
+    config = habitat.get_config(
+        config_paths=CFG_TEST, overrides="habitat/task/action=teleport"
+    )
 
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     env.reset()
     env.step(
         action={
@@ -47,12 +47,11 @@ def test_task_actions():
 
 
 def test_task_actions_sampling_for_teleport():
-    config = habitat.get_config(config_paths=CFG_TEST)
+    config = habitat.get_config(
+        config_paths=CFG_TEST, overrides="habitat/task/action=teleport"
+    )
 
-    with omegaconf.read_write(config):
-        config.task.possible_actions.append("teleport")
-
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     env.reset()
     while not env.episode_over:
         action = sample_non_stop_action(env.action_space)
@@ -78,14 +77,16 @@ def test_task_actions_sampling_for_teleport():
 def test_task_actions_sampling(config_file):
     config = habitat.get_config(config_paths=config_file)
     if not os.path.exists(
-        config.dataset.data_path.format(split=config.dataset.split)
+        config.habitat.dataset.data_path.format(
+            split=config.habitat.dataset.split
+        )
     ):
         pytest.skip(
             f"Please download dataset to data folder "
-            f"{config.dataset.data_path}."
+            f"{config.habitat.dataset.data_path}."
         )
 
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     env.reset()
     while not env.episode_over:
         action = sample_non_stop_action(env.action_space)

@@ -149,32 +149,30 @@ def main():
     HabitatSimActions.extend_action_space("strafe_left")
     HabitatSimActions.extend_action_space("strafe_right")
 
-    config = habitat.get_config(
-        config_paths="configs/tasks/pointnav.yaml"
-    ).habitat
+    config = habitat.get_config(config_paths="configs/tasks/pointnav.yaml")
 
     with omegaconf.read_write(config):
 
         with omegaconf.open_dict(config):
-            config.task.actions.strafe_left = omegaconf.OmegaConf.create(
+            config.habitat.task.action.strafe_left = omegaconf.OmegaConf.create(
                 dict(type="StrafeLeft")
             )
-            config.task.actions.strafe_right = omegaconf.OmegaConf.create(
+            config.habitat.task.action.strafe_right = omegaconf.OmegaConf.create(
                 dict(type="StrafeRight")
             )
 
-        config.simulator.action_space_config = "NoNoiseStrafe"
+        config.habitat.simulator.action_space_config = "NoNoiseStrafe"
 
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     env.reset()
     env.step("strafe_left")
     env.step("strafe_right")
     env.close()
 
     with omegaconf.read_write(config):
-        config.simulator.action_space_config = "NoiseStrafe"
+        config.habitat.simulator.action_space_config = "NoiseStrafe"
 
-    env = habitat.Env(config=config)
+    env = habitat.Env(config=config.habitat)
     env.reset()
     env.step("strafe_left")
     env.step("strafe_right")

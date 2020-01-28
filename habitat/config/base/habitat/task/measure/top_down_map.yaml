@@ -1,6 +1,6 @@
 habitat:
-  measure:
-    task:
+  task:
+    measure:
       top_down_map:
         draw_border: true
         draw_shortest_path: true

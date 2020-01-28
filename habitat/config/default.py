@@ -29,8 +29,10 @@ class HabitatHydraLoader(metaclass=Singleton):
         extended_cfg_defaults = hydra.experimental.compose(
             config_file, overrides=[]
         )
-        omegaconf.OmegaConf.set_struct(extended_cfg_defaults, True)
 
+        # This is big hack for dealing with the ordering in defaults in hydra vs.
+        # how we need it to behave.  In hydra, defaults get applied _last_,
+        # we need to be applied _first_
         extended_cfg_overrides = omegaconf.OmegaConf.load(config_file)
         if "defaults" in extended_cfg_overrides:
             del extended_cfg_overrides["defaults"]
@@ -72,7 +74,6 @@ class HabitatHydraLoader(metaclass=Singleton):
                 cfg, *[self._load_file(cfg_file) for cfg_file in config_paths]
             )
 
-        omegaconf.OmegaConf.set_struct(cfg, True)
         if overrides is not None:
             if isinstance(overrides, str):
                 overrides = [overrides]
@@ -80,6 +81,7 @@ class HabitatHydraLoader(metaclass=Singleton):
             overrides_cfg = hydra.experimental.compose(None, overrides)
             cfg = omegaconf.OmegaConf.merge(cfg, overrides_cfg)
 
+        omegaconf.OmegaConf.set_struct(cfg, True)
         omegaconf.OmegaConf.set_readonly(cfg, True)
         return cfg
 

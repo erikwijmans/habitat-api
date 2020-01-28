@@ -1,5 +1,6 @@
 defaults:
 - habitat/simulator/sensor: depth_sensor
+- habitat/simulator/sensor: rgb_sensor
 
 - habitat/task/sensor: pointgoal_with_gps_compass_sensor
 

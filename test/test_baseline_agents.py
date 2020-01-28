@@ -26,41 +26,43 @@ CFG_TEST = "configs/tasks/pointnav.yaml"
 @pytest.mark.skipif(
     not baseline_installed, reason="baseline sub-module not installed"
 )
-def test_ppo_agents():
+@pytest.mark.parametrize("input_type", ["blind", "rgb", "depth", "rgbd"])
+def test_ppo_agents(input_type):
     agent_config = ppo_agents.get_default_config()
     agent_config.model_path = ""
-    config_env = habitat.get_config(CFG_TEST)
+    config_env = habitat.get_config(
+        CFG_TEST, "habitat.environment.max_episode_steps=50"
+    )
     if not os.path.exists(config_env.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
     benchmark = habitat.Benchmark(config_paths=CFG_TEST)
 
-    for input_type in ["blind", "rgb", "depth", "rgbd"]:
-        with omegaconf.read_write(config_env), omegaconf.open_dict(config_env):
-            if "sensor" in config_env.habitat.simulator:
-                del config_env.habitat.simulator["sensor"]
-            if input_type in ["rgb", "rgbd"]:
-                config_env = omegaconf.OmegaConf.merge(
-                    config_env,
-                    hydra.experimental.compose(
-                        overrides=[
-                            "habitat/simulator/sensor=rgb_sensor",
-                            "habitat.simulator.sensor.rgb_sensor.width=256",
-                            "habitat.simulator.sensor.rgb_sensor.height=256",
-                        ]
-                    ),
-                )
-            if input_type in ["depth", "rgbd"]:
-                config_env = omegaconf.OmegaConf.merge(
-                    config_env,
-                    hydra.experimental.compose(
-                        overrides=[
-                            "habitat/simulator/sensor=depth_sensor",
-                            "habitat.simulator.sensor.depth_sensor.width=256",
-                            "habitat.simulator.sensor.depth_sensor.height=256",
-                        ]
-                    ),
-                )
+    with omegaconf.read_write(config_env), omegaconf.open_dict(config_env):
+        if "sensor" in config_env.habitat.simulator:
+            del config_env.habitat.simulator["sensor"]
+        if input_type in ["rgb", "rgbd"]:
+            config_env = omegaconf.OmegaConf.merge(
+                config_env,
+                hydra.experimental.compose(
+                    overrides=[
+                        "habitat/simulator/sensor=rgb_sensor",
+                        "habitat.simulator.sensor.rgb_sensor.width=256",
+                        "habitat.simulator.sensor.rgb_sensor.height=256",
+                    ]
+                ),
+            )
+        if input_type in ["depth", "rgbd"]:
+            config_env = omegaconf.OmegaConf.merge(
+                config_env,
+                hydra.experimental.compose(
+                    overrides=[
+                        "habitat/simulator/sensor=depth_sensor",
+                        "habitat.simulator.sensor.depth_sensor.width=256",
+                        "habitat.simulator.sensor.depth_sensor.height=256",
+                    ]
+                ),
+            )
 
         del benchmark._env
         benchmark._env = habitat.Env(config=config_env.habitat)
@@ -73,23 +75,29 @@ def test_ppo_agents():
 @pytest.mark.skipif(
     not baseline_installed, reason="baseline sub-module not installed"
 )
-def test_simple_agents():
+@pytest.mark.parametrize(
+    "agent_class",
+    [
+        simple_agents.ForwardOnlyAgent,
+        simple_agents.GoalFollower,
+        simple_agents.RandomAgent,
+        simple_agents.RandomForwardAgent,
+    ],
+)
+def test_simple_agents(agent_class):
     config_env = habitat.get_config(config_paths=CFG_TEST)
 
     if not os.path.exists(config_env.habitat.simulator.scene):
         pytest.skip("Please download Habitat test data to data folder.")
 
-    benchmark = habitat.Benchmark(config_paths=CFG_TEST)
+    benchmark = habitat.Benchmark(
+        config_paths=CFG_TEST,
+        overrides="habitat.environment.max_episode_steps=50",
+    )
 
-    for agent_class in [
-        simple_agents.ForwardOnlyAgent,
-        simple_agents.GoalFollower,
-        simple_agents.RandomAgent,
-        simple_agents.RandomForwardAgent,
-    ]:
-        agent = agent_class(
-            config_env.habitat.task.success_distance,
-            config_env.habitat.task.goal_sensor_uuid,
-        )
-        habitat.logger.info(agent_class.__name__)
-        habitat.logger.info(benchmark.evaluate(agent, num_episodes=100))
+    agent = agent_class(
+        config_env.habitat.task.success_distance,
+        config_env.habitat.task.goal_sensor_uuid,
+    )
+    habitat.logger.info(agent_class.__name__)
+    habitat.logger.info(benchmark.evaluate(agent, num_episodes=100))

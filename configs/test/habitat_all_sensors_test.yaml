@@ -10,6 +10,7 @@ defaults:
 
 habitat:
   environment:
-    max_episode_steps: 10
+    max_episode_steps: 100
   task:
     type: Nav-v0
+    success_distance: 0.2

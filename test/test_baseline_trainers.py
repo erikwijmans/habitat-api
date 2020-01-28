@@ -10,17 +10,19 @@ from glob import glob
 
 import pytest
 
-from habitat_baselines.common.base_trainer import BaseRLTrainer
-from habitat_baselines.config.default import get_config
-from run import run_exp
-
 try:
     import torch
-    import habitat_baselines
 
     baseline_installed = True
 except ImportError as e:
     baseline_installed = False
+
+
+if baseline_installed:
+    import habitat_baselines
+    from habitat_baselines.common.base_trainer import BaseRLTrainer
+    from habitat_baselines.config.default import get_config
+    from habitat_baselines.run import run_exp
 
 
 @pytest.mark.skipif(
@@ -45,7 +47,7 @@ def test_trainers(test_cfg_path, mode, gpu2gpu):
             pytest.skip("GPU-GPU requires CUDA")
 
     run_exp(
-        [test_cfg_path, "configs/tasks/pointnav.yaml"],
+        ["configs/tasks/pointnav.yaml", test_cfg_path],
         mode,
         [f"habitat.simulator.habitat_sim_v0.gpu_gpu={gpu2gpu}"],
     )
