@@ -183,7 +183,11 @@ class VlnResnetDepthEncoder(nn.Module):
         Returns:
             [BATCH, OUTPUT_SIZE]
         """
-        x = self.visual_encoder(observations)
+        if "depth_features" in observations:
+            x = observations["depth_features"]
+        else:
+            x = self.visual_encoder(observations)
+
         if self.spatial_output:
             b, c, h, w = x.size()
 
@@ -248,16 +252,17 @@ class TorchVisionResNet50(nn.Module):
         # disable gradients for resnet, params frozen
         for param in self.cnn.parameters():
             param.requires_grad = False
-        self.layer_extract = self.cnn._modules.get("avgpool")
         self.cnn.eval()
 
         self.spatial_output = spatial_output
 
         if not self.spatial_output:
+            self.layer_extract = self.cnn._modules.get("avgpool")
             self.output_shape = (output_size,)
             self.fc = nn.Linear(linear_layer_input_size, output_size)
             self.activation = nn.Tanh() if activation == "tanh" else nn.ReLU()
         else:
+            self.layer_extract = self.cnn._modules.get("layer4")
             self.spatial_embeddings = nn.Embedding(7 * 7, 64)
 
             self.output_shape = (
@@ -283,7 +288,7 @@ class TorchVisionResNet50(nn.Module):
 
             def hook(m, i, o):
                 if self.spatial_output:
-                    resnet_output.set_(i[0])
+                    resnet_output.set_(o)
                 else:
                     resnet_output.set_(torch.flatten(o, 1).data)
 
@@ -293,10 +298,14 @@ class TorchVisionResNet50(nn.Module):
             h.remove()
             return resnet_output
 
-        # permute tensor to dimension [BATCH x CHANNEL x HEIGHT x WIDTH]
-        rgb_observations = observations["rgb"].permute(0, 3, 1, 2)
-        rgb_observations = rgb_observations / 255.0  # normalize RGB
-        resnet_output = resnet_forward(rgb_observations)
+        if "rgb_features" in observations:
+            resnet_output = observations["rgb_features"]
+        else:
+            # permute tensor to dimension [BATCH x CHANNEL x HEIGHT x WIDTH]
+            rgb_observations = observations["rgb"].permute(0, 3, 1, 2)
+            rgb_observations = rgb_observations / 255.0  # normalize RGB
+            resnet_output = resnet_forward(rgb_observations)
+
         if self.spatial_output:
             b, c, h, w = resnet_output.size()
 

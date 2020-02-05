@@ -13,16 +13,19 @@ from gym import Space
 
 from habitat import Config
 from habitat_baselines.common.utils import CategoricalNet, Flatten
-from habitat_baselines.rl.models.instruction_encoder import InstructionEncoder
-from habitat_baselines.rl.models.resnet import ResNet50, VlnResnetDepthEncoder
-from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
-from habitat_baselines.rl.models.simple_cnn import (
+from habitat_baselines.models.instruction_encoder import InstructionEncoder
+from habitat_baselines.models.resnet_encoders import (
+    TorchVisionResNet50,
+    VlnResnetDepthEncoder,
+)
+from habitat_baselines.models.rmc.rmc_state_encoder import RMCStateEncoder
+from habitat_baselines.models.rnn_state_encoder import RNNStateEncoder
+from habitat_baselines.models.simple_cnn import (
     SimpleCNN,
     SimpleDepthCNN,
     SimpleRGBCNN,
 )
 from habitat_baselines.rl.ppo.policy import Net, Policy
-from habitat_baselines.rmc.rmc_state_encoder import RMCStateEncoder
 
 
 class VLNRMCPolicy(Policy):
@@ -66,47 +69,35 @@ class VLNRMCNet(Net):
 
         # Init the depth encoder
         assert vln_config.DEPTH_ENCODER.cnn_type in [
-            "SimpleDepthCNN",
-            "VlnResnetDepthEncoder",
-        ], "DEPTH_ENCODER.cnn_type must be SimpleDepthCNN or VlnResnetDepthEncoder"
-        if vln_config.DEPTH_ENCODER.cnn_type == "SimpleDepthCNN":
-            self.depth_encoder = SimpleDepthCNN(
-                observation_space, vln_config.DEPTH_ENCODER.output_size
-            )
-        elif vln_config.DEPTH_ENCODER.cnn_type == "VlnResnetDepthEncoder":
-            self.depth_encoder = VlnResnetDepthEncoder(
-                observation_space,
-                output_size=vln_config.DEPTH_ENCODER.output_size,
-                checkpoint=vln_config.DEPTH_ENCODER.ddppo_checkpoint,
-                backbone=vln_config.DEPTH_ENCODER.backbone,
-                spatial_output=True,
-            )
+            "VlnResnetDepthEncoder"
+        ], "DEPTH_ENCODER.cnn_type must be VlnResnetDepthEncoder"
+        self.depth_encoder = VlnResnetDepthEncoder(
+            observation_space,
+            output_size=vln_config.DEPTH_ENCODER.output_size,
+            checkpoint=vln_config.DEPTH_ENCODER.ddppo_checkpoint,
+            backbone=vln_config.DEPTH_ENCODER.backbone,
+            spatial_output=True,
+        )
 
         # Init the RGB visual encoder
         assert vln_config.VISUAL_ENCODER.cnn_type in [
-            "SimpleCNN",
-            "ResNet50",
-        ], "VISUAL_ENCODER.cnn_type must be either 'SimpleCNN' or 'ResNet50'."
+            "TorchVisionResNet50"
+        ], "VISUAL_ENCODER.cnn_type must be TorchVisionResNet50'."
 
-        if vln_config.VISUAL_ENCODER.cnn_type == "SimpleRGBCNN":
-            self.visual_encoder = SimpleRGBCNN(
-                observation_space, vln_config.VISUAL_ENCODER.output_size
-            )
-        elif vln_config.VISUAL_ENCODER.cnn_type == "ResNet50":
-            device = (
-                torch.device("cuda", vln_config.TORCH_GPU_ID)
-                if torch.cuda.is_available()
-                else torch.device("cpu")
-            )
-            self.visual_encoder = ResNet50(
-                observation_space,
-                vln_config.VISUAL_ENCODER.output_size,
-                device,
-                activation=vln_config.VISUAL_ENCODER.activation,
-                spatial_output=True,
-            )
+        device = (
+            torch.device("cuda", vln_config.TORCH_GPU_ID)
+            if torch.cuda.is_available()
+            else torch.device("cpu")
+        )
+        self.visual_encoder = TorchVisionResNet50(
+            observation_space,
+            vln_config.VISUAL_ENCODER.output_size,
+            device,
+            activation=vln_config.VISUAL_ENCODER.activation,
+            spatial_output=True,
+        )
 
-        self.rmc_state_encoder = True
+        self.rmc_state_encoder = vln_config.RMC.rmc_state_encoder
 
         hidden_size = vln_config.STATE_ENCODER.hidden_size
         self._hidden_size = hidden_size
@@ -118,13 +109,25 @@ class VLNRMCNet(Net):
                 num_actions=num_actions,
             )
         else:
-            raise RuntimeError(
-                "Use the RNN state encoder not supported currently"
+            self.rgb_linear = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(
+                    self.visual_encoder.output_shape[0],
+                    self.VISUAL_ENCODER.output_size,
+                ),
+                nn.ReLU(True),
+            )
+            self.depth_linear = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(
+                    np.prod(self.depth_encoder), self.DEPTH_ENCODER.output_size
+                ),
+                nn.ReLU(True),
             )
 
             # Init the RNN state decoder
-            rnn_input_size = self.instruction_encoder.output_size
-            rnn_input_size += vln_config.DEPTH_ENCODER.output_size
+            rnn_input_size = vln_config.DEPTH_ENCODER.output_size
             rnn_input_size += vln_config.VISUAL_ENCODER.output_size
 
             self.state_encoder = RNNStateEncoder(
@@ -207,13 +210,20 @@ class VLNRMCNet(Net):
                 rnn_hidden_states,
                 masks,
             )
+        else:
+            rgb_in = self.rgb_linear(rgb_embedding)
+            depth_in = self.rgb_linear(depth_embedding)
+
+            state_in = torch.cat([rgb_in, depth_in], dim=1)
+            state, rnn_hidden_states = self.state_encoder(
+                state_in, rnn_hidden_states, masks
+            )
 
         text_state_q = self.state_q(state)
         text_state_k = self.text_k(instruction_embedding)
-        text_state_v = instruction_embedding
         text_mask = (instruction_embedding != 0.0).all(dim=1)
         text_embedding = self._attn(
-            text_state_q, text_state_k, text_state_v, text_mask
+            text_state_q, text_state_k, instruction_embedding, text_mask
         )
 
         rgb_k, rgb_v = torch.split(

@@ -87,11 +87,11 @@ class InstructionEncoder(nn.Module):
 
         output, final_state = self.encoder_rnn(packed_seq)
 
-        if self.final_state_only:
-            if self.config.rnn_type == "LSTM":
-                final_state = final_state[0]
+        if self.config.rnn_type == "LSTM":
+            final_state = final_state[0]
 
-            final_state = final_state.squeeze(0)
+        final_state = final_state.squeeze(0)
+        if self.final_state_only:
             return final_state
         else:
             return nn.utils.rnn.pad_packed_sequence(output, batch_first=True)[

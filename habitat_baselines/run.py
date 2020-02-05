@@ -55,8 +55,8 @@ def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     random.seed(config.TASK_CONFIG.SEED)
     np.random.seed(config.TASK_CONFIG.SEED)
     torch.manual_seed(config.TASK_CONFIG.SEED)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    #  torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
 
     trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"

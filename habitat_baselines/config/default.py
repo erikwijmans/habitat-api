@@ -107,39 +107,6 @@ _C.IL.lr = 7e-4
 _C.IL.eps = 1e-5
 _C.IL.window_accuracy_size = 100
 # -----------------------------------------------------------------------------
-# VLN CONFIG
-# -----------------------------------------------------------------------------
-_C.RL.VLN = CN()
-_C.RL.VLN.INSTRUCTION_ENCODER = CN()
-_C.RL.VLN.INSTRUCTION_ENCODER.vocab_size = 5000
-_C.RL.VLN.INSTRUCTION_ENCODER.max_length = 200
-_C.RL.VLN.INSTRUCTION_ENCODER.use_pretrained_embeddings = False
-_C.RL.VLN.INSTRUCTION_ENCODER.embedding_file = "data/glove/glove.42B.300d.txt"
-_C.RL.VLN.INSTRUCTION_ENCODER.dataset_vocab = (
-    "data/datasets/vln/r2r/v1/train/train.json.gz"
-)
-_C.RL.VLN.INSTRUCTION_ENCODER.fine_tune_embeddings = False
-_C.RL.VLN.INSTRUCTION_ENCODER.embedding_size = 200
-_C.RL.VLN.INSTRUCTION_ENCODER.hidden_size = 512
-_C.RL.VLN.INSTRUCTION_ENCODER.rnn_type = "LSTM"
-_C.RL.VLN.INSTRUCTION_ENCODER.final_state_only = True
-_C.RL.VLN.VISUAL_ENCODER = CN()
-# TODO create setting for SimpleCNN to process the combined RGB+Depth image.
-# VISUAL_ENCODER cnn_type must be of 'SimpleRGBCNN' or 'ResNet50'
-_C.RL.VLN.VISUAL_ENCODER.cnn_type = "SimpleRGBCNN"
-_C.RL.VLN.VISUAL_ENCODER.output_size = 512
-_C.RL.VLN.VISUAL_ENCODER.activation = "tanh"  # relu or tanh
-_C.RL.VLN.DEPTH_ENCODER = CN()
-_C.RL.VLN.DEPTH_ENCODER.cnn_type = "SimpleDepthCNN"  # or VlnResnetDepthEncoder
-_C.RL.VLN.DEPTH_ENCODER.output_size = 512
-_C.RL.VLN.DEPTH_ENCODER.backbone = "NONE"  # type of resnet to use
-_C.RL.VLN.DEPTH_ENCODER.ddppo_checkpoint = (
-    "NONE"  # path to DDPPO resnet weights
-)
-_C.RL.VLN.STATE_ENCODER = CN()
-_C.RL.VLN.STATE_ENCODER.hidden_size = 512
-_C.RL.VLN.STATE_ENCODER.rnn_type = "GRU"
-# -----------------------------------------------------------------------------
 # DECENTRALIZED DISTRIBUTED PROXIMAL POLICY OPTIMIZATION (DD-PPO)
 # -----------------------------------------------------------------------------
 _C.RL.DDPPO = CN()
@@ -187,6 +154,7 @@ _C.VLN.INSTRUCTION_ENCODER.fine_tune_embeddings = False
 _C.VLN.INSTRUCTION_ENCODER.embedding_size = 200
 _C.VLN.INSTRUCTION_ENCODER.hidden_size = 512
 _C.VLN.INSTRUCTION_ENCODER.rnn_type = "LSTM"
+_C.VLN.INSTRUCTION_ENCODER.last_state_only = True
 _C.VLN.VISUAL_ENCODER = CN()
 # TODO create setting for SimpleCNN to process the combined RGB+Depth image.
 # VISUAL_ENCODER cnn_type must be of 'SimpleRGBCNN' or 'TorchVisionResNet50'
@@ -205,6 +173,9 @@ _C.VLN.DEPTH_ENCODER.ddppo_checkpoint = "NONE"
 _C.VLN.STATE_ENCODER = CN()
 _C.VLN.STATE_ENCODER.hidden_size = 512
 _C.VLN.STATE_ENCODER.rnn_type = "GRU"
+_C.VLN.RMC = CN()
+_C.VLN.RMC.use = False
+_C.VLN.RMC.rmc_state_encoder = True
 # -----------------------------------------------------------------------------
 # ORBSLAM2 BASELINE
 # -----------------------------------------------------------------------------

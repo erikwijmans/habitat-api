@@ -4,7 +4,7 @@ import torch.jit as jit
 import torch.nn as nn
 import torch.nn.functional as F
 
-from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
+from habitat_baselines.models.rnn_state_encoder import RNNStateEncoder
 
 
 def _unflatten_helper(x, t: int, n: int):

@@ -60,3 +60,10 @@ VLN:
     hidden_size: 512
     # Currently only works with GRU
     rnn_type: GRU
+
+  RMC:
+    # Set to True to use the RMC model
+    use: False
+    # Use the state encoding model in RMC
+    # If false, will just concat inputs and run an RNN over them
+    rmc_state_encoder: True
