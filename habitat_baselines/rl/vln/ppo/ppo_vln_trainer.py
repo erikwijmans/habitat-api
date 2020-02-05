@@ -30,14 +30,14 @@ from habitat_baselines.common.utils import (
     batch_obs,
     generate_video,
     linear_decay,
+    transform_obs,
 )
 from habitat_baselines.rl.ppo import PPO
-from habitat_baselines.rl.vln.ppo import VLNBaselinePolicy
-from habitat_baselines.rl.vln.ppo.utils import transform_observations
+from habitat_baselines.rl.vln.ppo import VLNBaselineRLPolicy
 
 
 @baseline_registry.register_trainer(name="ppo_vln")
-class PPOVLN_Trainer(BaseRLTrainer):
+class PPOVLNTrainer(BaseRLTrainer):
     r"""Trainer class for PPO algorithm
     Paper: https://arxiv.org/abs/1707.06347.
     """
@@ -50,35 +50,35 @@ class PPOVLN_Trainer(BaseRLTrainer):
         if config is not None:
             logger.info(f"config: {config}")
 
-    def _setup_actor_critic_agent_training(self, rl_cfg: Config) -> None:
+    def _setup_actor_critic_agent_training(self, cfg: Config) -> None:
         r"""Sets up actor critic and agent for PPO.
 
         Args:
-            rl_cfg: config node with relevant params
+            cfg: config node with relevant params
 
         Returns:
             None
         """
-        logger.add_filehandler(self.config.LOG_FILE)
+        logger.add_filehandler(cfg.LOG_FILE)
 
         # Add TORCH_GPU_ID to VLN config for a ResNet layer
-        rl_cfg.defrost()
-        rl_cfg.VLN.TORCH_GPU_ID = self.config.TORCH_GPU_ID
-        rl_cfg.freeze()
+        cfg.defrost()
+        cfg.VLN.TORCH_GPU_ID = cfg.TORCH_GPU_ID
+        cfg.freeze()
 
-        self.actor_critic = VLNBaselinePolicy(
+        self.actor_critic = VLNBaselineRLPolicy(
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
-            vln_config=rl_cfg.VLN,
+            vln_config=cfg.VLN,
         )
         self.actor_critic.to(self.device)
 
-        if rl_cfg.LOAD_FROM_CKPT:
+        if cfg.RL.LOAD_FROM_CKPT:
             # assumes config params are the same. Manually removes first
             # keyword to conform to expected key name.
-            logger.info(f"Loading checkpoint: {rl_cfg.CKPT_TO_LOAD}")
+            logger.info(f"Loading checkpoint: {cfg.RL.CKPT_TO_LOAD}")
             il_checkpoint = self.load_checkpoint(
-                rl_cfg.CKPT_TO_LOAD, map_location=self.device
+                cfg.RL.CKPT_TO_LOAD, map_location=self.device
             )
             logger.info(
                 f"Loading weights expecting CONFIG.RL.VLN params: {il_checkpoint['config']['RL']['VLN']}"
@@ -104,7 +104,7 @@ class PPOVLN_Trainer(BaseRLTrainer):
             self.actor_critic.load_state_dict(il_checkpoint_dict, strict=False)
             del il_checkpoint_dict
 
-        ppo_cfg = rl_cfg.PPO
+        ppo_cfg = cfg.RL.PPO
         self.agent = PPO(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
@@ -115,10 +115,13 @@ class PPOVLN_Trainer(BaseRLTrainer):
             lr=ppo_cfg.lr,
             eps=ppo_cfg.eps,
             max_grad_norm=ppo_cfg.max_grad_norm,
+            use_clipped_value_loss=ppo_cfg.use_clipped_value_loss,
             use_normalized_advantage=ppo_cfg.use_normalized_advantage,
+            use_different_critic_lr=ppo_cfg.use_different_critic_lr,
+            critic_lr=ppo_cfg.critic_lr,
         )
 
-    def _setup_actor_critic_agent(self, rl_cfg: Config) -> None:
+    def _setup_actor_critic_agent(self, cfg: Config) -> None:
         r"""Sets up actor critic and agent for PPO.
 
         Args:
@@ -127,21 +130,21 @@ class PPOVLN_Trainer(BaseRLTrainer):
         Returns:
             None
         """
-        logger.add_filehandler(self.config.LOG_FILE)
+        logger.add_filehandler(cfg.LOG_FILE)
 
         # Add TORCH_GPU_ID to VLN config for a ResNet layer
-        rl_cfg.defrost()
-        rl_cfg.VLN.TORCH_GPU_ID = self.config.TORCH_GPU_ID
-        rl_cfg.freeze()
+        cfg.defrost()
+        cfg.VLN.TORCH_GPU_ID = cfg.TORCH_GPU_ID
+        cfg.freeze()
 
-        self.actor_critic = VLNBaselinePolicy(
+        self.actor_critic = VLNBaselineRLPolicy(
             observation_space=self.envs.observation_spaces[0],
             action_space=self.envs.action_spaces[0],
-            vln_config=rl_cfg.VLN,
+            vln_config=cfg.VLN,
         )
         self.actor_critic.to(self.device)
 
-        ppo_cfg = rl_cfg.PPO
+        ppo_cfg = cfg.RL.PPO
         self.agent = PPO(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
@@ -152,7 +155,10 @@ class PPOVLN_Trainer(BaseRLTrainer):
             lr=ppo_cfg.lr,
             eps=ppo_cfg.eps,
             max_grad_norm=ppo_cfg.max_grad_norm,
+            use_clipped_value_loss=ppo_cfg.use_clipped_value_loss,
             use_normalized_advantage=ppo_cfg.use_normalized_advantage,
+            use_different_critic_lr=ppo_cfg.use_different_critic_lr,
+            critic_lr=ppo_cfg.critic_lr,
         )
 
     def save_checkpoint(self, file_name: str) -> None:
@@ -216,14 +222,14 @@ class PPOVLN_Trainer(BaseRLTrainer):
 
         outputs = self.envs.step([a[0].item() for a in actions])
         observations, rewards, dones, infos = [list(x) for x in zip(*outputs)]
-        observations = transform_observations(
-            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID
+        observations = transform_obs(
+            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
         )
+        batch = batch_obs(observations, self.device)
 
         env_time += time.time() - t_step_env
 
         t_update_stats = time.time()
-        batch = batch_obs(observations)
         rewards = torch.tensor(rewards, dtype=torch.float)
         rewards = rewards.unsqueeze(1)
 
@@ -300,7 +306,7 @@ class PPOVLN_Trainer(BaseRLTrainer):
         if not os.path.isdir(self.config.CHECKPOINT_FOLDER):
             os.makedirs(self.config.CHECKPOINT_FOLDER)
 
-        self._setup_actor_critic_agent_training(rl_config)
+        self._setup_actor_critic_agent_training(self.config)
         logger.info(
             "agent number of parameters: {}".format(
                 sum(p.numel() for p in self.agent.parameters())
@@ -320,8 +326,8 @@ class PPOVLN_Trainer(BaseRLTrainer):
         for i in range(len(self.envs.observation_spaces)):
             self.envs.observation_spaces[i].spaces["instruction"] = spaces.Box(
                 low=0,
-                high=self.config.RL.VLN.INSTRUCTION_ENCODER.vocab_size,
-                shape=(self.config.RL.VLN.INSTRUCTION_ENCODER.max_length,),
+                high=self.config.VLN.INSTRUCTION_ENCODER.vocab_size,
+                shape=(self.config.VLN.INSTRUCTION_ENCODER.max_length,),
                 dtype=np.float32,
             )
 
@@ -330,15 +336,15 @@ class PPOVLN_Trainer(BaseRLTrainer):
             self.envs.num_envs,
             self.envs.observation_spaces[0],
             self.envs.action_spaces[0],
-            ppo_cfg.hidden_size,
+            self.config.VLN.STATE_ENCODER.hidden_size,
         )
         rollouts.to(self.device)
 
         observations = self.envs.reset()
-        observations = transform_observations(
-            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID
+        observations = transform_obs(
+            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
         )
-        batch = batch_obs(observations)
+        batch = batch_obs(observations, self.device)
 
         for sensor in rollouts.observations:
             rollouts.observations[sensor][0].copy_(batch[sensor])
@@ -538,14 +544,14 @@ class PPOVLN_Trainer(BaseRLTrainer):
         self.envs = construct_envs(
             self.config, get_env_class(self.config.ENV_NAME)
         )
-        self._setup_actor_critic_agent(self.config.RL)
+        self._setup_actor_critic_agent(self.config)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
         self.actor_critic = self.agent.actor_critic
 
         observations = self.envs.reset()
-        observations = transform_observations(
-            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID
+        observations = transform_obs(
+            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
         )
         batch = batch_obs(observations, self.device)
 
@@ -556,7 +562,7 @@ class PPOVLN_Trainer(BaseRLTrainer):
         test_recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
             self.config.NUM_PROCESSES,
-            self.config.RL.VLN.STATE_ENCODER.hidden_size,
+            self.config.VLN.STATE_ENCODER.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
@@ -599,7 +605,7 @@ class PPOVLN_Trainer(BaseRLTrainer):
             observations, rewards, dones, infos = [
                 list(x) for x in zip(*outputs)
             ]
-            observations = transform_observations(
+            observations = transform_obs(
                 observations,
                 self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
             )

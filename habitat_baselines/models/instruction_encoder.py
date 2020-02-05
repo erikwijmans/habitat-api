@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 
 from habitat import Config, logger
-from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 
 
 class InstructionEncoder(nn.Module):

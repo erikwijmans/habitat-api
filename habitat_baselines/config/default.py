@@ -62,6 +62,8 @@ _C.RL.PPO.num_mini_batch = 16
 _C.RL.PPO.value_loss_coef = 0.5
 _C.RL.PPO.entropy_coef = 0.01
 _C.RL.PPO.lr = 7e-4
+_C.RL.PPO.use_different_critic_lr = False
+_C.RL.PPO.critic_lr = 2.5e-4
 _C.RL.PPO.eps = 1e-5
 _C.RL.PPO.max_grad_norm = 0.5
 _C.RL.PPO.num_steps = 5
@@ -72,6 +74,7 @@ _C.RL.PPO.gamma = 0.99
 _C.RL.PPO.tau = 0.95
 _C.RL.PPO.reward_window_size = 50
 _C.RL.PPO.use_normalized_advantage = True
+_C.RL.PPO.use_clipped_value_loss = True
 _C.RL.PPO.hidden_size = 512
 # -----------------------------------------------------------------------------
 # DAGGER ENVIRONMENT CONFIG
@@ -154,6 +157,54 @@ _C.RL.DDPPO.pretrained_encoder = False
 _C.RL.DDPPO.train_encoder = True
 # Whether or not to reset the critic linear layer
 _C.RL.DDPPO.reset_critic = True
+# -----------------------------------------------------------------------------
+# DAGGER ENVIRONMENT CONFIG
+# -----------------------------------------------------------------------------
+_C.DAGGER = CN()
+_C.DAGGER.LR = 1e-3
+_C.DAGGER.ITERATIONS = 5
+_C.DAGGER.EPOCHS = 10
+_C.DAGGER.UPDATE_SIZE = 20000
+_C.DAGGER.BATCH_SIZE = 5
+_C.DAGGER.P = 0.75
+_C.DAGGER.LMDB_MAP_SIZE = 1e9  # 1GB
+_C.DAGGER.USE_IW = False
+# -----------------------------------------------------------------------------
+# VLN CONFIG
+# -----------------------------------------------------------------------------
+_C.VLN = CN()
+# on GT trajectories in the training set
+_C.VLN.inflection_weight_coef = 3.2
+_C.VLN.INSTRUCTION_ENCODER = CN()
+_C.VLN.INSTRUCTION_ENCODER.vocab_size = 5000
+_C.VLN.INSTRUCTION_ENCODER.max_length = 200
+_C.VLN.INSTRUCTION_ENCODER.use_pretrained_embeddings = False
+_C.VLN.INSTRUCTION_ENCODER.embedding_file = "data/glove/glove.42B.300d.txt"
+_C.VLN.INSTRUCTION_ENCODER.dataset_vocab = (
+    "data/datasets/vln/r2r/v1/train/train.json.gz"
+)
+_C.VLN.INSTRUCTION_ENCODER.fine_tune_embeddings = False
+_C.VLN.INSTRUCTION_ENCODER.embedding_size = 200
+_C.VLN.INSTRUCTION_ENCODER.hidden_size = 512
+_C.VLN.INSTRUCTION_ENCODER.rnn_type = "LSTM"
+_C.VLN.VISUAL_ENCODER = CN()
+# TODO create setting for SimpleCNN to process the combined RGB+Depth image.
+# VISUAL_ENCODER cnn_type must be of 'SimpleRGBCNN' or 'TorchVisionResNet50'
+_C.VLN.VISUAL_ENCODER.cnn_type = "SimpleRGBCNN"
+_C.VLN.VISUAL_ENCODER.output_size = 512
+# relu or tanh
+_C.VLN.VISUAL_ENCODER.activation = "relu"
+_C.VLN.DEPTH_ENCODER = CN()
+# or VlnResnetDepthEncoder
+_C.VLN.DEPTH_ENCODER.cnn_type = "SimpleDepthCNN"
+_C.VLN.DEPTH_ENCODER.output_size = 512
+# type of resnet to use
+_C.VLN.DEPTH_ENCODER.backbone = "NONE"
+# path to DDPPO resnet weights
+_C.VLN.DEPTH_ENCODER.ddppo_checkpoint = "NONE"
+_C.VLN.STATE_ENCODER = CN()
+_C.VLN.STATE_ENCODER.hidden_size = 512
+_C.VLN.STATE_ENCODER.rnn_type = "GRU"
 # -----------------------------------------------------------------------------
 # ORBSLAM2 BASELINE
 # -----------------------------------------------------------------------------

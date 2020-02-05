@@ -1,0 +1,62 @@
+BASE_TASK_CONFIG_PATH: configs/tasks/vln_r2r.yaml
+TRAINER_NAME: dagger
+RUN_NAME: debug
+ENV_NAME: VLNRLEnv
+SIMULATOR_GPU_ID: 0
+TORCH_GPU_ID: 0
+TENSORBOARD_DIR: tensorboard_dirs/debug
+# using compressed meshes, 8 procs fit on a single 1080 Ti GPU.
+NUM_PROCESSES: 1
+CHECKPOINT_FOLDER: data/checkpoints/vln/debug
+# if file, eval just that checkpoint.
+EVAL_CKPT_PATH_DIR: data/checkpoints/vln/debug
+# any num greater than episode count evals every episode
+TEST_EPISODE_COUNT: 100000
+VIDEO_OPTION: []  # [disk, tensorboard]
+VIDEO_DIR: videos/debug
+EVAL:
+  USE_CKPT_CONFIG: False
+  SPLIT: val_seen
+
+DAGGER:
+  LR: 2.5e-4
+  # set to 1 for student forcing and teacher forcing
+  ITERATIONS: 4
+  EPOCHS: 6
+  UPDATE_SIZE: 5000
+  BATCH_SIZE: 2
+  # Student forcing: set to 0.0
+  # Teacher forcing: set to 1.0
+  # DAgger: 0.0 < P < 1.0
+  P: 1.0
+  USE_IW: True
+  # ~1.5TB (in bytes)
+  # 4 iterations of 5K update_size -> 1TB dataset
+  LMDB_MAP_SIZE: 1.65e+12
+
+VLN:
+  inflection_weight_coef: 3.2
+  INSTRUCTION_ENCODER:
+    vocab_size: 2504
+    max_length: 153
+    use_pretrained_embeddings: True
+    embedding_file: ./data/datasets/vln/mp3d/r2r/v1/preprocessed/embeddings.json
+    dataset_vocab: ./data/datasets/vln/mp3d/r2r/v1/preprocessed/train/train.json.gz
+    fine_tune_embeddings: False
+    embedding_size: 50
+    hidden_size: 128
+    rnn_type: LSTM
+  DEPTH_ENCODER:
+    # SimpleDepthCNN or VlnResnetDepthEncoder
+    cnn_type: VlnResnetDepthEncoder
+    output_size: 128
+    backbone: resnet50
+    ddppo_checkpoint: data/dd-ppo-weights/gibson-2plus-resnet50.pth
+  VISUAL_ENCODER:
+    cnn_type: TorchVisionResNet50
+    output_size: 256
+    activation: relu
+  STATE_ENCODER:
+    hidden_size: 512
+    # Currently only works with GRU
+    rnn_type: GRU

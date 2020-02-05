@@ -1,69 +1,78 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/vln_r2r.yaml"
-TRAINER_NAME: "ppo_vln"
-ENV_NAME: "VLNRLEnv"
+BASE_TASK_CONFIG_PATH: configs/tasks/vln_r2r.yaml
+TRAINER_NAME: ppo_vln
+RUN_NAME: debug
+ENV_NAME: VLNRLEnv
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
-VIDEO_OPTION: ["disk", "tensorboard"]
-TENSORBOARD_DIR: "tensorboard_dirs/debug"
-VIDEO_DIR: "videos/debug"
-TEST_EPISODE_COUNT: 10
-EVAL_CKPT_PATH_DIR: "data/checkpoints/vln/debug"
+VIDEO_OPTION: []  # [disk, tensorboard]
+TENSORBOARD_DIR: tensorboard_dirs/debug
+VIDEO_DIR: videos/debug
+TEST_EPISODE_COUNT: 100000
+EVAL_CKPT_PATH_DIR: data/checkpoints/vln/debug
 NUM_PROCESSES: 1
-SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
-CHECKPOINT_FOLDER: "data/checkpoints/vln/debug"
+SENSORS: [RGB_SENSOR, DEPTH_SENSOR]
+CHECKPOINT_FOLDER: data/checkpoints/vln/debug
 NUM_UPDATES: 500000
 LOG_INTERVAL: 10
-CHECKPOINT_INTERVAL: 500  # 100
+CHECKPOINT_INTERVAL: 150
 EVAL:
   USE_CKPT_CONFIG: False
-  SPLIT: train
+  SPLIT: val_seen
 
 RL:
-  SUCCESS_REWARD: 10.0
+  SUCCESS_REWARD: 5.0
   SLACK_REWARD: -0.01
 
-  LOAD_FROM_CKPT: True
-  CKPT_TO_LOAD: "data/checkpoints/vln/il/6/ckpt.64.pth"
+  LOAD_FROM_CKPT: False
+  CKPT_TO_LOAD: data/checkpoints/vln/il/6/ckpt.64.pth
 
   PPO:
-    # ppo params
     clip_param: 0.2  # 0.1
     ppo_epoch: 4
     num_mini_batch: 1
     value_loss_coef: 0.5
     entropy_coef: 0.01
-    lr: 2.5e-4
+    lr: 1e-7
+    # when doing a warmstart, use a higher lr for critic.
+    use_different_critic_lr: True
+    critic_lr: 2.5e-4
     eps: 1e-5
     max_grad_norm: 0.5
     num_steps: 128
-    hidden_size: 512
     use_gae: True
     gamma: 0.99
     tau: 0.95
     use_linear_clip_decay: True
     use_linear_lr_decay: True
     reward_window_size: 50
-    use_normalized_advantage: False # True for pointnav, but can hurt settings
-                              # like ObjectNav or PointNav when no GPS+Compass
-                              # sensor is involved.
-  VLN:
-    # Vision and Language Navigation parameters
-    INSTRUCTION_ENCODER:
-      vocab_size: 2504
-      max_length: 153
-      use_pretrained_embeddings: True
-      embedding_file: "./data/datasets/vln/mp3d/r2r/v1/preprocessed/embeddings.json"
-      dataset_vocab: "./data/datasets/vln/mp3d/r2r/v1/preprocessed/train/train.json.gz"
-      fine_tune_embeddings: False
-      embedding_size: 50
-      hidden_size: 256
-      rnn_type: "LSTM"
-    DEPTH_ENCODER:
-      cnn_type: "SimpleDepthCNN"
-      output_size: 512
-    VISUAL_ENCODER:
-      cnn_type: "ResNet50"
-      output_size: 512
-    STATE_ENCODER:
-      hidden_size: 512
-      rnn_type: "GRU"  # Currently only works with GRU
+    # True for pointnav, but can hurt settings like ObjectNav
+    # or PointNav when no GPS+Compass sensor is involved.
+    use_normalized_advantage: False
+    use_clipped_value_loss: False
+
+# Vision and Language Navigation model parameters
+VLN:
+  INSTRUCTION_ENCODER:
+    vocab_size: 2504
+    max_length: 153
+    use_pretrained_embeddings: True
+    embedding_file: ./data/datasets/vln/mp3d/r2r/v1/preprocessed/embeddings.json
+    dataset_vocab: ./data/datasets/vln/mp3d/r2r/v1/preprocessed/train/train.json.gz
+    fine_tune_embeddings: False
+    embedding_size: 50
+    hidden_size: 128
+    rnn_type: LSTM
+  DEPTH_ENCODER:
+    # SimpleDepthCNN or VlnResnetDepthEncoder
+    cnn_type: VlnResnetDepthEncoder
+    output_size: 128
+    backbone: resnet50
+    ddppo_checkpoint: data/dd-ppo-weights/gibson-2plus-resnet50.pth
+  VISUAL_ENCODER:
+    cnn_type: TorchVisionResNet50
+    output_size: 256
+    activation: relu
+  STATE_ENCODER:
+    hidden_size: 512
+    # Currently only works with GRU
+    rnn_type: GRU

@@ -77,9 +77,9 @@ class NavRLEnv(habitat.RLEnv):
 
     def _distance_target(self):
         current_position = self._env.sim.get_agent_state().position.tolist()
-        target_position = self._env.current_episode.goals[0].position
         distance = self._env.sim.geodesic_distance(
-            current_position, target_position
+            current_position,
+            [goal.position for goal in self._env.current_episode.goals],
         )
         return distance
 
@@ -169,53 +169,3 @@ class VLNRLEnv(habitat.RLEnv):
 
     def get_info(self, observations):
         return self.habitat_env.get_metrics()
-
-
-@baseline_registry.register_env(name="VLNILEnv")
-class VLNILEnv(habitat.Env):
-    def __init__(self, config: Config, dataset: Optional[Dataset] = None):
-        super().__init__(config.TASK_CONFIG, dataset)
-        assert (
-            getattr(self._sim, "geodesic_distance", None) is not None
-        ), "{} must have a method called geodesic_distance".format(
-            type(self._sim).__name__
-        )
-        assert (
-            getattr(self._sim, "get_straight_shortest_path_points", None)
-            is not None
-        ), "{} must have a method called get_straight_shortest_path_points".format(
-            type(self._sim).__name__
-        )
-        self.follower = ShortestPathFollower(
-            self._sim,
-            goal_radius=0.5,  # all goals can be navigated to within 0.5m.
-            return_one_hot=False,
-        )
-        self.follower.mode = "geodesic_path"
-
-    def reset(self):
-        observations = super().reset()
-        return observations
-
-    def step(self, *args, **kwargs):
-        kwargs["action"]
-        return super().step(*args, **kwargs)
-
-    def get_episode_over(self):
-        """When in a VectorEnv, properties cannot be queried. Thus make this a
-        function to be called.
-        """
-        return self.episode_over
-
-    def get_best_action(self):
-        """Computes and returns the action along the shortest path to the goal.
-        Makes the assumption that the best action a VLN agent should take is
-        the shortest path action. This assumption is fair in R2R, but may not
-        be for other datasets.
-        """
-        best_action = self.follower.get_next_action(
-            self.current_episode.goals[0].position
-        )
-        if best_action is None:
-            return HabitatSimActions.STOP
-        return best_action

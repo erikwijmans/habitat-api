@@ -14,8 +14,8 @@ from habitat_baselines.common.utils import (
     CustomFixedCategorical,
     Flatten,
 )
-from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
-from habitat_baselines.rl.models.simple_cnn import SimpleCNN
+from habitat_baselines.models.rnn_state_encoder import RNNStateEncoder
+from habitat_baselines.models.simple_cnn import SimpleCNN
 
 
 class Policy(nn.Module):
@@ -95,6 +95,30 @@ class CriticHead(nn.Module):
 
     def forward(self, x):
         return self.fc(x)
+
+
+class CriticHeadMLP(nn.Module):
+    def __init__(self, input_size):
+        # when input_size == 512 there are about 200K params.
+        super().__init__()
+
+        def init_weights(m):
+            if type(m) == nn.Linear:
+                nn.init.orthogonal_(m.weight)
+                nn.init.constant_(m.bias, 0)
+
+        hidden_size = int(input_size / 2.0)
+        self.layers = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, 1),
+        )
+        self.layers.apply(init_weights)
+
+    def forward(self, x):
+        return self.layers(x)
 
 
 class PointNavBaselinePolicy(Policy):

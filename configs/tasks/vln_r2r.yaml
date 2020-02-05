@@ -15,8 +15,8 @@ SIMULATOR:
     HFOV: 90
     TYPE: HabitatSimRGBSensor
   DEPTH_SENSOR:
-    WIDTH: 224  # DAgger DDPPO resnet needs 256x256
-    HEIGHT: 224
+    WIDTH: 256  # DAgger DDPPO resnet needs 256x256
+    HEIGHT: 256
 TASK:
   TYPE: VLN-v0
   SUCCESS_DISTANCE: 3.0
@@ -39,13 +39,13 @@ TASK:
     FDTW: True  # False: DTW
     SPLIT: train
     SUCCESS_DISTANCE: 3.0
-    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/preprocessed/{split}/{split}_gt_all.json.gz"
+    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/preprocessed/{split}/{split}_gt.json.gz"
   SDTW:
     TYPE: SDTW
     FDTW: True  # False: DTW
     SPLIT: train
     SUCCESS_DISTANCE: 3.0
-    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/preprocessed/{split}/{split}_gt_all.json.gz"
+    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/preprocessed/{split}/{split}_gt.json.gz"
   SPL:
     TYPE: SPL
     SUCCESS_DISTANCE: 3.0

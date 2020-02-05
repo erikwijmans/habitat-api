@@ -23,9 +23,8 @@ from habitat_baselines.common.env_utils import (
 )
 from habitat_baselines.common.environments import get_env_class
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
-from habitat_baselines.common.utils import batch_obs
-from habitat_baselines.rl.vln.ppo.policy import VLNBaselinePolicy
-from habitat_baselines.rl.vln.ppo.utils import transform_observations
+from habitat_baselines.common.utils import batch_obs, transform_obs
+from habitat_baselines.models.vln_baseline_policy import VLNBaselinePolicy
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning)
@@ -143,15 +142,22 @@ class LengthGroupedSampler(torch.utils.data.Sampler):
 
 
 class IWTrajectoryDataset(torch.utils.data.Dataset):
-    def __init__(self, trajectories_env_dir, length, use_iw):
+    def __init__(
+        self,
+        trajectories_env_dir,
+        length,
+        use_iw,
+        inflection_weight_coef=1.0,
+        lmbd_map_size=1e9,
+    ):
         super().__init__()
         self.trajectories_env_dir = trajectories_env_dir
         self.lmdb_env = None
         self.length = length
+        self.lmbd_map_size = lmbd_map_size
 
         if use_iw:
-            # Here I specify the R2R inflection weight coeff (3.2)
-            self.inflec_weights = torch.tensor([1.0, 3.2])
+            self.inflec_weights = torch.tensor([1.0, inflection_weight_coef])
         else:
             self.inflec_weights = torch.tensor([1.0, 1.0])
 
@@ -159,7 +165,7 @@ class IWTrajectoryDataset(torch.utils.data.Dataset):
         if self.lmdb_env is None:
             self.lmdb_env = lmdb.open(
                 self.trajectories_env_dir,
-                map_size=int(self.config.DAGGER.LMDB_MAP_SIZE),
+                map_size=int(self.lmbd_map_size),
                 readonly=True,
                 lock=False,
             )
@@ -268,7 +274,8 @@ class DaggerTrainer(BaseRLTrainer):
         return torch.load(checkpoint_path, *args, **kwargs)
 
     def _update_dataset(self, data_it):
-        torch.cuda.empty_cache()
+        with torch.cuda.device(self.device):
+            torch.cuda.empty_cache()
         if self.envs is None:
             self.envs = construct_envs(
                 self.config, get_env_class(self.config.ENV_NAME)
@@ -277,7 +284,7 @@ class DaggerTrainer(BaseRLTrainer):
         recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
             self.config.NUM_PROCESSES,
-            self.config.RL.VLN.STATE_ENCODER.hidden_size,
+            self.config.VLN.STATE_ENCODER.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
@@ -288,8 +295,8 @@ class DaggerTrainer(BaseRLTrainer):
         )
 
         observations = self.envs.reset()
-        observations = transform_observations(
-            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID
+        observations = transform_obs(
+            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
         )
         batch = batch_obs(observations, self.device)
 
@@ -302,7 +309,11 @@ class DaggerTrainer(BaseRLTrainer):
         # Theoretically, any beta function is fine so long as it converges to
         # zero as data_it -> inf. The paper suggests starting with beta = 1 and
         # exponential decay.
-        beta = self.config.DAGGER.P ** data_it
+        if self.config.DAGGER.P == 0.0:
+            # in Python 0.0 ** 0.0 == 1.0, but we want 0.0
+            beta = 0.0
+        else:
+            beta = self.config.DAGGER.P ** data_it
 
         collected_eps = 0
         with tqdm.tqdm(
@@ -384,10 +395,7 @@ class DaggerTrainer(BaseRLTrainer):
                 prev_actions.copy_(actions)
 
                 outputs = self.envs.step([a[0].item() for a in actions])
-
-                observations, rewards, dones, infos = [
-                    list(x) for x in zip(*outputs)
-                ]
+                observations, _, dones, _ = [list(x) for x in zip(*outputs)]
 
                 not_done_masks = torch.tensor(
                     [[0.0] if done else [1.0] for done in dones],
@@ -395,7 +403,7 @@ class DaggerTrainer(BaseRLTrainer):
                     device=self.device,
                 )
 
-                observations = transform_observations(
+                observations = transform_obs(
                     observations,
                     self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
                 )
@@ -418,7 +426,7 @@ class DaggerTrainer(BaseRLTrainer):
         recurrent_hidden_states = torch.zeros(
             self.actor_critic.net.num_recurrent_layers,
             N,
-            self.config.RL.VLN.STATE_ENCODER.hidden_size,
+            self.config.VLN.STATE_ENCODER.hidden_size,
             device=self.device,
         )
 
@@ -457,7 +465,7 @@ class DaggerTrainer(BaseRLTrainer):
             self.config, get_env_class(self.config.ENV_NAME)
         )
         os.makedirs(self.config.CHECKPOINT_FOLDER, exist_ok=True)
-        self._setup_actor_critic_agent(self.config.RL.VLN)
+        self._setup_actor_critic_agent(self.config.VLN)
         logger.info(
             "agent number of parameters: {}".format(
                 sum(param.numel() for param in self.actor_critic.parameters())
@@ -478,10 +486,11 @@ class DaggerTrainer(BaseRLTrainer):
             flush_secs=self.flush_secs,
             purge_step=0,
         ) as writer:
-            for dagger_it in range(self.config.DAGGER.STABBINGS):
+            for dagger_it in range(self.config.DAGGER.ITERATIONS):
                 step_id = 0
                 self._update_dataset(dagger_it)
-                torch.cuda.empty_cache()
+                with torch.cuda.device(self.device):
+                    torch.cuda.empty_cache()
                 gc.collect()
 
                 sampler = LengthGroupedSampler(
@@ -491,6 +500,8 @@ class DaggerTrainer(BaseRLTrainer):
                     self.trajectories_env_dir,
                     len(self.trajectory_lengths),
                     self.config.DAGGER.USE_IW,
+                    inflection_weight_coef=self.config.VLN.inflection_weight_coef,
+                    lmbd_map_size=self.config.DAGGER.LMDB_MAP_SIZE,
                 )
                 diter = torch.utils.data.DataLoader(
                     dataset,
@@ -519,21 +530,59 @@ class DaggerTrainer(BaseRLTrainer):
                             for k, v in observations_batch.items()
                         }
 
-                        loss = self._update_agent(
-                            observations_batch,
-                            prev_actions_batch.to(
-                                device=self.device, non_blocking=True
-                            ),
-                            not_done_masks.to(
-                                device=self.device, non_blocking=True
-                            ),
-                            corrected_actions_batch.to(
-                                device=self.device, non_blocking=True
-                            ),
-                            weights_batch.to(
-                                device=self.device, non_blocking=True
-                            ),
-                        )
+                        try:
+                            loss = self._update_agent(
+                                observations_batch,
+                                prev_actions_batch.to(
+                                    device=self.device, non_blocking=True
+                                ),
+                                not_done_masks.to(
+                                    device=self.device, non_blocking=True
+                                ),
+                                corrected_actions_batch.to(
+                                    device=self.device, non_blocking=True
+                                ),
+                                weights_batch.to(
+                                    device=self.device, non_blocking=True
+                                ),
+                            )
+                        except:
+                            logger.info(
+                                "ERROR: failed to update agent. Updating agent with batch size of 1."
+                            )
+                            loss = 0
+                            prev_actions_batch = prev_actions_batch.cpu()
+                            not_done_masks = not_done_masks.cpu()
+                            corrected_actions_batch = (
+                                corrected_actions_batch.cpu()
+                            )
+                            weights_batch = weights_batch.cpu()
+                            observations_batch = {
+                                k: v.cpu()
+                                for k, v in observations_batch.items()
+                            }
+                            for i in range(not_done_masks.size(0)):
+                                loss += self._update_agent(
+                                    {
+                                        k: v[i].to(
+                                            device=self.device,
+                                            non_blocking=True,
+                                        )
+                                        for k, v in observations_batch.items()
+                                    },
+                                    prev_actions_batch[i].to(
+                                        device=self.device, non_blocking=True
+                                    ),
+                                    not_done_masks[i].to(
+                                        device=self.device, non_blocking=True
+                                    ),
+                                    corrected_actions_batch[i].to(
+                                        device=self.device, non_blocking=True
+                                    ),
+                                    weights_batch[i].to(
+                                        device=self.device, non_blocking=True
+                                    ),
+                                )
 
                         logger.info(f"train_loss: {loss}")
                         logger.info(f"Batches processed: {step_id}.")
@@ -628,19 +677,19 @@ class DaggerTrainer(BaseRLTrainer):
             else torch.device("cpu")
         )
 
-        self._setup_actor_critic_agent(config.RL.VLN)
+        self._setup_actor_critic_agent(config.VLN)
         self.actor_critic.load_state_dict(ckpt_dict["state_dict"])
 
         observations = self.envs.reset()
-        observations = transform_observations(
-            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID
+        observations = transform_obs(
+            observations, self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
         )
         batch = batch_obs(observations, self.device)
 
         eval_recurrent_hidden_states = torch.zeros(
             1,  # num_recurrent_layers
             self.config.NUM_PROCESSES,
-            self.config.RL.VLN.STATE_ENCODER.hidden_size,
+            self.config.VLN.STATE_ENCODER.hidden_size,
             device=self.device,
         )
         prev_actions = torch.zeros(
@@ -657,11 +706,9 @@ class DaggerTrainer(BaseRLTrainer):
             rgb_frames = [[] for _ in range(self.config.NUM_PROCESSES)]
 
         self.actor_critic.eval()
-        # loop for each step to cover all test episodes
         while (
-            self.envs.num_envs
-            > 0
-            # and len(stats_episodes) < self.config.TEST_EPISODE_COUNT
+            self.envs.num_envs > 0
+            and len(stats_episodes) < self.config.TEST_EPISODE_COUNT
         ):
             current_episodes = self.envs.current_episodes()
 
@@ -680,38 +727,28 @@ class DaggerTrainer(BaseRLTrainer):
                 )
                 prev_actions.copy_(actions)
 
-            observations = self.envs.step([a.item() for a in actions])
-            episodes_over = torch.tensor(
-                [
-                    int(self.envs.call_at(i, "get_episode_over"))
-                    for i in range(self.envs.num_envs)
-                ],
-                dtype=torch.int,
+            outputs = self.envs.step([a[0].item() for a in actions])
+            observations, _, dones, infos = [list(x) for x in zip(*outputs)]
+
+            not_done_masks = torch.tensor(
+                [[0.0] if done else [1.0] for done in dones],
+                dtype=torch.float,
+                device=self.device,
             )
-            # thanks to these masks, we don't need to reset the RNN state
-            not_done_masks = (
-                episodes_over.clone().float().to(self.device).unsqueeze(1)
-            )
-            not_done_masks[episodes_over == 1] = 0
-            not_done_masks[episodes_over == 0] = 1
 
             # reset envs and observations if necessary
             for i in range(self.envs.num_envs):
                 if len(self.config.VIDEO_OPTION) > 0:
-                    frame = observations_to_image(
-                        observations[i], self.envs.call_at(i, "get_metrics")
-                    )
+                    frame = observations_to_image(observations[i], infos[i])
                     frame = append_text_to_image(
                         frame, current_episodes[i].instruction.instruction_text
                     )
                     rgb_frames[i].append(frame)
 
-                if not episodes_over[i]:
+                if not dones[i]:
                     continue
 
-                stats_episodes[
-                    current_episodes[i].episode_id
-                ] = self.envs.call_at(i, "get_metrics")
+                stats_episodes[current_episodes[i].episode_id] = infos[i]
                 observations[i] = self.envs.reset_at(i)[0]
                 prev_actions[i] = torch.zeros(1, dtype=torch.long)
 
@@ -740,7 +777,7 @@ class DaggerTrainer(BaseRLTrainer):
                     ]
                     rgb_frames[i] = []
 
-            observations = transform_observations(
+            observations = transform_obs(
                 observations,
                 self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
             )
@@ -770,7 +807,6 @@ class DaggerTrainer(BaseRLTrainer):
 
         self.envs.close()
 
-        time.sleep(5)
         aggregated_stats = {}
         num_episodes = len(stats_episodes)
         for stat_key in next(iter(stats_episodes.values())).keys():
@@ -786,4 +822,4 @@ class DaggerTrainer(BaseRLTrainer):
         checkpoint_num = checkpoint_index + 1
         for k, v in aggregated_stats.items():
             logger.info(f"Average episode {k}: {v:.6f}")
-            writer.add_scalar(f"mini_eval_{k}", v, checkpoint_num)
+            writer.add_scalar(f"eval_{k}", v, checkpoint_num)

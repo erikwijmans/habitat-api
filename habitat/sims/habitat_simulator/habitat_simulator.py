@@ -4,7 +4,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 import numpy as np
 from gym import spaces
@@ -177,6 +177,11 @@ class HabitatSim(Simulator):
         sim_config = habitat_sim.SimulatorConfiguration()
         sim_config.scene.id = self.config.SCENE
         sim_config.gpu_device_id = self.config.HABITAT_SIM_V0.GPU_DEVICE_ID
+        # sim_config.allow_sliding = self.config.HABITAT_SIM_V0.ALLOW_SLIDING
+        sim_config.enable_physics = self.config.HABITAT_SIM_V0.ENABLE_PHYSICS
+        sim_config.physics_config_file = (
+            self.config.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE
+        )
         agent_config = habitat_sim.AgentConfiguration()
         overwrite_config(
             config_from=self._get_agent_config(), config_to=agent_config
@@ -280,10 +285,19 @@ class HabitatSim(Simulator):
         self._update_agents_state()
 
     def geodesic_distance(self, position_a, position_b):
-        path = habitat_sim.ShortestPath()
+        path = habitat_sim.MultiGoalShortestPath()
         path.requested_start = np.array(position_a, dtype=np.float32)
-        path.requested_end = np.array(position_b, dtype=np.float32)
+        if isinstance(position_b[0], List) or isinstance(
+            position_b[0], np.ndarray
+        ):
+            path.requested_ends = np.array(position_b, dtype=np.float32)
+        else:
+            path.requested_ends = np.array(
+                [np.array(position_b, dtype=np.float32)]
+            )
+
         self._sim.pathfinder.find_path(path)
+
         return path.geodesic_distance
 
     def action_space_shortest_path(

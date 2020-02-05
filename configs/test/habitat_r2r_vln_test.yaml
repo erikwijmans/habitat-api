@@ -32,13 +32,13 @@ TASK:
     FDTW: True  # False: DTW
     SPLIT: val_seen
     SUCCESS_DISTANCE: 3.0
-    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}_gt_all.json.gz"
+    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}_gt.json.gz"
   SDTW:
     TYPE: SDTW
     FDTW: True  # False: DTW
     SPLIT: val_seen
     SUCCESS_DISTANCE: 3.0
-    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}_gt_all.json.gz"
+    GT_PATH: "data/datasets/vln/mp3d/r2r/v1/{split}/{split}_gt.json.gz"
 
 DATASET:
   TYPE: R2RVLN-v1

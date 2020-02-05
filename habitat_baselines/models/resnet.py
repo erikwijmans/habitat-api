@@ -7,6 +7,8 @@
 import torch
 import torch.nn as nn
 
+from habitat_baselines.models.running_mean_and_var import RunningMeanAndVar
+
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1):
     """3x3 convolution with padding"""
