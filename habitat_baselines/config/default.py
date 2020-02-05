@@ -119,6 +119,7 @@ _C.RL.VLN.INSTRUCTION_ENCODER.fine_tune_embeddings = False
 _C.RL.VLN.INSTRUCTION_ENCODER.embedding_size = 200
 _C.RL.VLN.INSTRUCTION_ENCODER.hidden_size = 512
 _C.RL.VLN.INSTRUCTION_ENCODER.rnn_type = "LSTM"
+_C.RL.VLN.INSTRUCTION_ENCODER.final_state_only = True
 _C.RL.VLN.VISUAL_ENCODER = CN()
 # TODO create setting for SimpleCNN to process the combined RGB+Depth image.
 # VISUAL_ENCODER cnn_type must be of 'SimpleRGBCNN' or 'ResNet50'

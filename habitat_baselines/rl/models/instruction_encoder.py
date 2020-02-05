@@ -22,6 +22,7 @@ class InstructionEncoder(nn.Module):
                 dataset_vocab:
                 hidden_size: The hidden (output) size
                 rnn_type: The RNN cell type.  Must be GRU or LSTM
+                final_state_only: Whether or not to return just the final state
         """
         super().__init__()
 
@@ -43,6 +44,7 @@ class InstructionEncoder(nn.Module):
         self.encoder_rnn = rnn(
             input_size=config.embedding_size, hidden_size=config.hidden_size
         )
+        self.final_state_only = config.final_state_only
 
     @property
     def output_size(self):
@@ -77,19 +79,22 @@ class InstructionEncoder(nn.Module):
         """
         instruction = observations["instruction"].long()
 
-        # pack_padded_sequence fails if the as_tensor call is not made explicitly
-        lengths = (instruction != 0.0).sum(dim=1)
-        lengths = torch.as_tensor(lengths, dtype=torch.int64)
+        lengths = (instruction != 0.0).long().sum(dim=1)
         embedded = self.embedding_layer(instruction)
 
         packed_seq = nn.utils.rnn.pack_padded_sequence(
             embedded, lengths, batch_first=True, enforce_sorted=False
         )
 
-        _, hidden_state = self.encoder_rnn(packed_seq)
+        output, final_state = self.encoder_rnn(packed_seq)
 
-        if self.config.rnn_type == "LSTM":
-            hidden_state = hidden_state[0]
+        if self.final_state_only:
+            if self.config.rnn_type == "LSTM":
+                final_state = final_state[0]
 
-        hidden_state = hidden_state.squeeze(0)
-        return hidden_state
+            final_state = final_state.squeeze(0)
+            return final_state
+        else:
+            return nn.utils.rnn.pad_packed_sequence(output, batch_first=True)[
+                0
+            ].permute(0, 2, 1)

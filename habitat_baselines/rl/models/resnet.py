@@ -25,6 +25,7 @@ class VlnResnetDepthEncoder(nn.Module):
         resnet_baseplanes=32,
         normalize_visual_inputs=False,
         trainable=False,
+        spatial_output: bool = False,
     ):
         super().__init__()
         self.visual_encoder = ResNetEncoder(
@@ -53,11 +54,27 @@ class VlnResnetDepthEncoder(nn.Module):
             del ddppo_weights
             self.visual_encoder.load_state_dict(weights_dict, strict=True)
 
-        self.visual_fc = nn.Sequential(
-            Flatten(),
-            nn.Linear(np.prod(self.visual_encoder.output_shape), output_size),
-            nn.ReLU(True),
-        )
+        self.spatial_output = spatial_output
+
+        if not self.spatial_output:
+            self.output_shape = (output_size,)
+            self.visual_fc = nn.Sequential(
+                Flatten(),
+                nn.Linear(
+                    np.prod(self.visual_encoder.output_shape), output_size
+                ),
+                nn.ReLU(True),
+            )
+        else:
+            self.spatial_embeddings = nn.Embedding(
+                self.visual_encoder.output_shape[1]
+                * self.visual_encoder.output_shape[2],
+                64,
+            )
+
+            self.output_shape = list(self.visual_encoder.output_shape)
+            self.output_shape[0] += self.spatial_embeddings.embedding_dim
+            self.output_shape = tuple(self.output_shape)
 
     def forward(self, observations):
         """
@@ -67,7 +84,25 @@ class VlnResnetDepthEncoder(nn.Module):
             [BATCH, OUTPUT_SIZE]
         """
         x = self.visual_encoder(observations)
-        return self.visual_fc(x)
+        if self.spatial_output:
+            b, c, h, w = x.size()
+
+            spatial_features = (
+                self.spatial_embeddings(
+                    torch.arange(
+                        0,
+                        self.spatial_embeddings.num_embeddings,
+                        device=x.device,
+                        dtype=torch.long,
+                    )
+                )
+                .view(1, -1, h, w)
+                .expand(b, self.spatial_embeddings.embedding_dim, h, w)
+            )
+
+            return torch.cat([x, spatial_features], dim=1)
+        else:
+            return self.visual_fc(x)
 
 
 class ResNet50(nn.Module):
@@ -81,7 +116,12 @@ class ResNet50(nn.Module):
     """
 
     def __init__(
-        self, observation_space, output_size, device, activation="tanh"
+        self,
+        observation_space,
+        output_size,
+        device,
+        activation="tanh",
+        spatial_output: bool = False,
     ):
         super().__init__()
         self.device = device
@@ -111,8 +151,20 @@ class ResNet50(nn.Module):
         self.layer_extract = self.cnn._modules.get("avgpool")
         self.cnn.eval()
 
-        self.fc = nn.Linear(linear_layer_input_size, output_size)
-        self.activation = nn.Tanh() if activation == "tanh" else nn.ReLU()
+        self.spatial_output = spatial_output
+
+        if not self.spatial_output:
+            self.output_shape = (output_size,)
+            self.fc = nn.Linear(linear_layer_input_size, output_size)
+            self.activation = nn.Tanh() if activation == "tanh" else nn.ReLU()
+        else:
+            self.spatial_embeddings = nn.Embedding(7 * 7, 64)
+
+            self.output_shape = (
+                self.resnet_layer_size + self.spatial_embeddings.embedding_dim,
+                7,
+                7,
+            )
 
     @property
     def is_blind(self):
@@ -126,12 +178,14 @@ class ResNet50(nn.Module):
 
         def resnet_forward(observation):
             resnet_output = torch.zeros(
-                observation.size(0), self.resnet_layer_size
-            ).to(self.device)
+                1, dtype=torch.float32, device=self.device
+            )
 
             def hook(m, i, o):
-                # self.resnet_output.resize_(d.size())
-                resnet_output.copy_(torch.flatten(o, 1).data)
+                if self.spatial_output:
+                    resnet_output.set_(i[0])
+                else:
+                    resnet_output.set_(torch.flatten(o, 1).data)
 
             # output: [BATCH x RESNET_DIM]
             h = self.layer_extract.register_forward_hook(hook)
@@ -143,4 +197,24 @@ class ResNet50(nn.Module):
         rgb_observations = observations["rgb"].permute(0, 3, 1, 2)
         rgb_observations = rgb_observations / 255.0  # normalize RGB
         resnet_output = resnet_forward(rgb_observations)
-        return self.activation(self.fc(resnet_output))  # [BATCH x OUTPUT_DIM]
+        if self.spatial_output:
+            b, c, h, w = resnet_output.size()
+
+            spatial_features = (
+                self.spatial_embeddings(
+                    torch.arange(
+                        0,
+                        self.spatial_embeddings.num_embeddings,
+                        device=resnet_output.device,
+                        dtype=torch.long,
+                    )
+                )
+                .view(1, -1, h, w)
+                .expand(b, self.spatial_embeddings.embedding_dim, h, w)
+            )
+
+            return torch.cat([resnet_output, spatial_features], dim=1)
+        else:
+            return self.activation(
+                self.fc(resnet_output)
+            )  # [BATCH x OUTPUT_DIM]
