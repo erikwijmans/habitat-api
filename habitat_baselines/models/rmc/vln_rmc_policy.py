@@ -212,7 +212,7 @@ class VLNRMCNet(Net):
             )
         else:
             rgb_in = self.rgb_linear(rgb_embedding)
-            depth_in = self.rgb_linear(depth_embedding)
+            depth_in = self.depth_linear(depth_embedding)
 
             state_in = torch.cat([rgb_in, depth_in], dim=1)
             state, rnn_hidden_states = self.state_encoder(
