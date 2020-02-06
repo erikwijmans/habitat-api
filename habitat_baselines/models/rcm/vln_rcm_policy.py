@@ -14,11 +14,11 @@ from gym import Space
 from habitat import Config
 from habitat_baselines.common.utils import CategoricalNet, Flatten
 from habitat_baselines.models.instruction_encoder import InstructionEncoder
+from habitat_baselines.models.rcm.rcm_state_encoder import RCMStateEncoder
 from habitat_baselines.models.resnet_encoders import (
     TorchVisionResNet50,
     VlnResnetDepthEncoder,
 )
-from habitat_baselines.models.rmc.rmc_state_encoder import RMCStateEncoder
 from habitat_baselines.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.models.simple_cnn import (
     SimpleCNN,
@@ -28,12 +28,12 @@ from habitat_baselines.models.simple_cnn import (
 from habitat_baselines.rl.ppo.policy import Net, Policy
 
 
-class VLNRMCPolicy(Policy):
+class VLNRCMPolicy(Policy):
     def __init__(
         self, observation_space: Space, action_space: Space, vln_config: Config
     ):
         super().__init__(
-            VLNRMCNet(
+            VLNRCMNet(
                 observation_space=observation_space,
                 vln_config=vln_config,
                 num_actions=action_space.n,
@@ -42,7 +42,7 @@ class VLNRMCPolicy(Policy):
         )
 
 
-class VLNRMCNet(Net):
+class VLNRCMNet(Net):
     r"""Network which passes the input image through CNN and concatenates
     goal vector with CNN's output and passes that through RNN.
 
@@ -50,7 +50,7 @@ class VLNRMCNet(Net):
         Instruction encoder
         Depth encoder
         Visual (RGB) encoder
-        RNN state decoder or RMC state_encoder
+        RNN state decoder or RCM state_encoder
     """
 
     def __init__(
@@ -97,12 +97,12 @@ class VLNRMCNet(Net):
             spatial_output=True,
         )
 
-        self.rmc_state_encoder = vln_config.RMC.rmc_state_encoder
+        self.rcm_state_encoder = vln_config.RCM.rcm_state_encoder
 
         hidden_size = vln_config.STATE_ENCODER.hidden_size
         self._hidden_size = hidden_size
-        if self.rmc_state_encoder:
-            self.state_encoder = RMCStateEncoder(
+        if self.rcm_state_encoder:
+            self.state_encoder = RCMStateEncoder(
                 self.visual_encoder.output_shape[0],
                 self.depth_encoder.output_shape[0],
                 vln_config.STATE_ENCODER.hidden_size,
@@ -202,7 +202,7 @@ class VLNRMCNet(Net):
         rgb_embedding = self.visual_encoder(observations)
         rgb_embedding = torch.flatten(rgb_embedding, 2)
 
-        if self.rmc_state_encoder:
+        if self.rcm_state_encoder:
             state, rnn_hidden_states = self.state_encoder(
                 rgb_embedding,
                 depth_embedding,
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
     action_space = spaces.Discrete(4)
 
-    policy = VLNRMCPolicy(observation_space, action_space, config.RL.VLN)
+    policy = VLNRCMPolicy(observation_space, action_space, config.RL.VLN)
 
     dummy_instruction = torch.randint(1, 4, size=(4 * 2, 8))
     dummy_instruction[:, 5:] = 0

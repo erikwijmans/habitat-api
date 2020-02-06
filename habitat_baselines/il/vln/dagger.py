@@ -24,7 +24,7 @@ from habitat_baselines.common.env_utils import (
 from habitat_baselines.common.environments import get_env_class
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.common.utils import batch_obs, transform_obs
-from habitat_baselines.models.rmc.vln_rmc_policy import VLNRMCPolicy
+from habitat_baselines.models.rcm.vln_rcm_policy import VLNRCMPolicy
 from habitat_baselines.models.vln_baseline_policy import VLNBaselinePolicy
 
 with warnings.catch_warnings():
@@ -233,8 +233,8 @@ class DaggerTrainer(BaseRLTrainer):
         config.TORCH_GPU_ID = self.config.TORCH_GPU_ID
         config.freeze()
 
-        if config.RMC.use:
-            self.actor_critic = VLNRMCPolicy(
+        if config.RCM.use:
+            self.actor_critic = VLNRCMPolicy(
                 observation_space=self.envs.observation_spaces[0],
                 action_space=self.envs.action_spaces[0],
                 vln_config=config,

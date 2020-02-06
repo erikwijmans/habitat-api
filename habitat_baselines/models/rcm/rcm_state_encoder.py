@@ -14,7 +14,7 @@ def _unflatten_helper(x, t: int, n: int):
     return x.view(new_sz)
 
 
-class RMCStateEncoder(RNNStateEncoder):
+class RCMStateEncoder(RNNStateEncoder):
     def __init__(
         self,
         rgb_input_channels: int,
@@ -130,13 +130,13 @@ class RMCStateEncoder(RNNStateEncoder):
 
 
 if __name__ == "__main__":
-    rmc = RMCStateEncoder(2048, 1024, 256, 4)
+    rcm = RCMStateEncoder(2048, 1024, 256, 4)
 
     rgb_input = torch.randn(2 * 4, 2048, 7 * 7)
     depth_input = torch.randn(2 * 4, 1024, 4 * 4)
     prev_actions = torch.randint(3, size=(2 * 4,))
     masks = torch.randint(1, size=(2 * 4,)).float()
 
-    hidden_states = torch.randn(rmc.num_recurrent_layers, 4, 256)
+    hidden_states = torch.randn(rcm.num_recurrent_layers, 4, 256)
 
-    rmc(rgb_input, depth_input, prev_actions, hidden_states, masks)
+    rcm(rgb_input, depth_input, prev_actions, hidden_states, masks)

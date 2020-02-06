@@ -61,9 +61,9 @@ VLN:
     # Currently only works with GRU
     rnn_type: GRU
 
-  RMC:
-    # Set to True to use the RMC model
+  RCM:
+    # Set to True to use the RCM model
     use: False
-    # Use the state encoding model in RMC
+    # Use the state encoding model in RCM
     # If false, will just concat inputs and run an RNN over them
-    rmc_state_encoder: True
+    rcm_state_encoder: True

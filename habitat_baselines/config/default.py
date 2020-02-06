@@ -143,9 +143,9 @@ _C.VLN.DEPTH_ENCODER.ddppo_checkpoint = "NONE"
 _C.VLN.STATE_ENCODER = CN()
 _C.VLN.STATE_ENCODER.hidden_size = 512
 _C.VLN.STATE_ENCODER.rnn_type = "GRU"
-_C.VLN.RMC = CN()
-_C.VLN.RMC.use = False
-_C.VLN.RMC.rmc_state_encoder = True
+_C.VLN.RCM = CN()
+_C.VLN.RCM.use = False
+_C.VLN.RCM.rcm_state_encoder = True
 # -----------------------------------------------------------------------------
 # ORBSLAM2 BASELINE
 # -----------------------------------------------------------------------------
