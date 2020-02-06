@@ -77,36 +77,6 @@ _C.RL.PPO.use_normalized_advantage = True
 _C.RL.PPO.use_clipped_value_loss = True
 _C.RL.PPO.hidden_size = 512
 # -----------------------------------------------------------------------------
-# DAGGER ENVIRONMENT CONFIG
-# -----------------------------------------------------------------------------
-_C.DAGGER = CN()
-_C.DAGGER.LR = 1e-3
-_C.DAGGER.STABBINGS = 5
-_C.DAGGER.EPOCHS = 10
-_C.DAGGER.UPDATE_SIZE = 20000
-_C.DAGGER.BATCH_SIZE = 5
-_C.DAGGER.P = 0.75
-_C.DAGGER.LMDB_MAP_SIZE = 1e9  # 1GB
-_C.DAGGER.USE_IW = False
-# -----------------------------------------------------------------------------
-# IMITATION LEARNING (IL) ENVIRONMENT CONFIG
-# -----------------------------------------------------------------------------
-_C.IL = CN()
-_C.IL.ALGORITHM = (
-    "TEACHER_FORCING"  # either "TEACHER_FORCING" or "STUDENT_FORCING"
-)
-_C.IL.GT_PATH = "data/datasets/vln/mp3d/r2r/v1/train/train_gt_all.json.gz"
-_C.IL.BUFFER_SIZE = (
-    128  # max number of steps to hold for each environment in rollout storage
-)
-_C.IL.ROLLOUT_CLASS = (
-    "RolloutStorageEpisodeBased"  # or RolloutStorageFixedBatch
-)
-_C.IL.LOSS_SCALING = "NONE"  # INFLECTION, TRAJECTORY, or NONE
-_C.IL.lr = 7e-4
-_C.IL.eps = 1e-5
-_C.IL.window_accuracy_size = 100
-# -----------------------------------------------------------------------------
 # DECENTRALIZED DISTRIBUTED PROXIMAL POLICY OPTIMIZATION (DD-PPO)
 # -----------------------------------------------------------------------------
 _C.RL.DDPPO = CN()
