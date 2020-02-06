@@ -724,7 +724,7 @@ class DaggerTrainer(BaseRLTrainer):
         batch = batch_obs(observations, self.device)
 
         eval_recurrent_hidden_states = torch.zeros(
-            1,  # num_recurrent_layers
+            self.actor_critic.net.num_recurrent_layers,
             self.config.NUM_PROCESSES,
             self.config.VLN.STATE_ENCODER.hidden_size,
             device=self.device,

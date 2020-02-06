@@ -221,7 +221,7 @@ class VLNRCMNet(Net):
 
         text_state_q = self.state_q(state)
         text_state_k = self.text_k(instruction_embedding)
-        text_mask = (instruction_embedding != 0.0).all(dim=1)
+        text_mask = (instruction_embedding == 0.0).all(dim=1)
         text_embedding = self._attn(
             text_state_q, text_state_k, instruction_embedding, text_mask
         )
