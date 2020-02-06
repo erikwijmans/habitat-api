@@ -105,6 +105,9 @@ _C.DAGGER.UPDATE_SIZE = 20000
 _C.DAGGER.BATCH_SIZE = 5
 _C.DAGGER.P = 0.75
 _C.DAGGER.LMDB_MAP_SIZE = 1e9  # 1GB
+# How often to commit the writes to the DB,
+# less commits is better, but everything must be in memory until a commit happens
+_C.DAGGER.LMDB_COMMIT_FREQUENCY = 500
 _C.DAGGER.USE_IW = False
 # -----------------------------------------------------------------------------
 # VLN CONFIG

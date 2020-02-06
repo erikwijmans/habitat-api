@@ -352,6 +352,7 @@ class DaggerTrainer(BaseRLTrainer):
             map_size=int(self.config.DAGGER.LMDB_MAP_SIZE),
         ) as lmdb_env, torch.no_grad():
             start_id = lmdb_env.stat()["entries"]
+            txn = lmdb_env.begin(write=True)
 
             while collected_eps < self.config.DAGGER.UPDATE_SIZE:
                 for i in range(self.envs.num_envs):
@@ -370,17 +371,23 @@ class DaggerTrainer(BaseRLTrainer):
                             np.array([step[1] for step in ep], dtype=np.int64),
                             np.array([step[2] for step in ep], dtype=np.int64),
                         ]
-                        with lmdb_env.begin(write=True) as txn:
-                            txn.put(
-                                str(start_id + collected_eps).encode(),
-                                msgpack_numpy.packb(
-                                    transposed_ep, use_bin_type=True
-                                ),
-                            )
+                        txn.put(
+                            str(start_id + collected_eps).encode(),
+                            msgpack_numpy.packb(
+                                transposed_ep, use_bin_type=True
+                            ),
+                        )
 
                         self.trajectory_lengths.append(len(ep))
                         pbar.update()
                         collected_eps += 1
+
+                        if (
+                            collected_eps
+                            % self.config.DAGGER.LMDB_COMMIT_FREQUENCY
+                        ) == 0:
+                            txn.commit()
+                            txn = lmdb_env.begin(write=True)
 
                     if dones[i]:
                         episodes[i] = []
@@ -441,6 +448,8 @@ class DaggerTrainer(BaseRLTrainer):
                     self.config.TASK_CONFIG.TASK.INSTRUCTION_SENSOR_UUID,
                 )
                 batch = batch_obs(observations, self.device)
+
+            txn.commit()
 
         self.envs.close()
         self.envs = None
