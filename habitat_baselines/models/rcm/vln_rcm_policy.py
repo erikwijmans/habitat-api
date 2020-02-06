@@ -207,7 +207,7 @@ class VLNRCMNet(Net):
         rgb_embedding = torch.flatten(rgb_embedding, 2)
 
         prev_actions = self.prev_action_embedding(
-            ((prev_actions.float() + 1).view(-1) * masks).long()
+            ((prev_actions.float() + 1) * masks).long().view(-1)
         )
 
         if self.rcm_state_encoder:
@@ -303,8 +303,8 @@ if __name__ == "__main__":
         policy.net._hidden_size,
         device=device,
     )
-    prev_actions = torch.randint(0, 3, size=(4 * 2,), device=device)
-    masks = torch.ones(4 * 2, device=device)
+    prev_actions = torch.randint(0, 3, size=(4 * 2, 1), device=device)
+    masks = torch.ones(4 * 2, 1, device=device)
 
     policy.evaluate_actions(
         obs, hidden_states, prev_actions, masks, prev_actions
