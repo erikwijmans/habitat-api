@@ -350,9 +350,7 @@ class DaggerTrainer(BaseRLTrainer):
         ) as pbar, lmdb.open(
             self.trajectories_env_dir,
             map_size=int(self.config.DAGGER.LMDB_MAP_SIZE),
-        ) as lmdb_env, lmdb_env.begin(
-            write=True
-        ) as txn, torch.no_grad():
+        ) as lmdb_env, torch.no_grad():
             start_id = lmdb_env.stat()["entries"]
 
             while collected_eps < self.config.DAGGER.UPDATE_SIZE:
@@ -372,12 +370,13 @@ class DaggerTrainer(BaseRLTrainer):
                             np.array([step[1] for step in ep], dtype=np.int64),
                             np.array([step[2] for step in ep], dtype=np.int64),
                         ]
-                        txn.put(
-                            str(start_id + collected_eps).encode(),
-                            msgpack_numpy.packb(
-                                transposed_ep, use_bin_type=True
-                            ),
-                        )
+                        with lmdb_env.begin(write=True) as txn:
+                            txn.put(
+                                str(start_id + collected_eps).encode(),
+                                msgpack_numpy.packb(
+                                    transposed_ep, use_bin_type=True
+                                ),
+                            )
 
                         self.trajectory_lengths.append(len(ep))
                         pbar.update()
