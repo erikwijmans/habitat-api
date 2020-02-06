@@ -20,7 +20,7 @@ class RCMStateEncoder(RNNStateEncoder):
         rgb_input_channels: int,
         depth_input_channels: int,
         hidden_size: int,
-        num_actions: int,
+        action_embedding_size: int,
         num_layers: int = 1,
         rnn_type: str = "GRU",
     ):
@@ -38,10 +38,8 @@ class RCMStateEncoder(RNNStateEncoder):
             "_scale", torch.tensor(1.0 / ((hidden_size // 2) ** 0.5))
         )
 
-        self.prev_action_embedding = nn.Embedding(num_actions + 1, 32)
-
         self.rnn = getattr(nn, rnn_type)(
-            input_size=hidden_size + self.prev_action_embedding.embedding_dim,
+            input_size=hidden_size + action_embedding_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
         )
@@ -88,11 +86,7 @@ class RCMStateEncoder(RNNStateEncoder):
         rgb_embedding = _unflatten_helper(rgb_embedding, t, n)
         depth_embedding = _unflatten_helper(depth_embedding, t, n)
         masks = masks.view(t, n)
-        prev_actions = prev_actions.view(t, n)
-
-        prev_actions = self.prev_action_embedding(
-            ((prev_actions.float() + 1) * masks).long()
-        )
+        prev_actions = prev_actions.view(t, n, -1)
 
         outputs = []
         for it in range(t):
@@ -130,11 +124,11 @@ class RCMStateEncoder(RNNStateEncoder):
 
 
 if __name__ == "__main__":
-    rcm = RCMStateEncoder(2048, 1024, 256, 4)
+    rcm = RCMStateEncoder(2048, 1024, 256, 32)
 
     rgb_input = torch.randn(2 * 4, 2048, 7 * 7)
     depth_input = torch.randn(2 * 4, 1024, 4 * 4)
-    prev_actions = torch.randint(3, size=(2 * 4,))
+    prev_actions = torch.randn(2 * 4, 32)
     masks = torch.randint(1, size=(2 * 4,)).float()
 
     hidden_states = torch.randn(rcm.num_recurrent_layers, 4, 256)

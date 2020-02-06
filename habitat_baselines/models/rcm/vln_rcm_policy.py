@@ -97,6 +97,8 @@ class VLNRCMNet(Net):
             spatial_output=True,
         )
 
+        self.prev_action_embedding = nn.Embedding(num_actions + 1, 32)
+
         self.rcm_state_encoder = vln_config.RCM.rcm_state_encoder
 
         hidden_size = vln_config.STATE_ENCODER.hidden_size
@@ -106,22 +108,23 @@ class VLNRCMNet(Net):
                 self.visual_encoder.output_shape[0],
                 self.depth_encoder.output_shape[0],
                 vln_config.STATE_ENCODER.hidden_size,
-                num_actions=num_actions,
+                self.prev_action_embedding.embedding_dim,
             )
         else:
             self.rgb_linear = nn.Sequential(
-                nn.AdaptiveAvgPool2d(1),
+                nn.AdaptiveAvgPool1d(1),
                 nn.Flatten(),
                 nn.Linear(
                     self.visual_encoder.output_shape[0],
-                    self.VISUAL_ENCODER.output_size,
+                    self.vln_config.VISUAL_ENCODER.output_size,
                 ),
                 nn.ReLU(True),
             )
             self.depth_linear = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(
-                    np.prod(self.depth_encoder), self.DEPTH_ENCODER.output_size
+                    np.prod(self.depth_encoder.output_shape),
+                    self.vln_config.DEPTH_ENCODER.output_size,
                 ),
                 nn.ReLU(True),
             )
@@ -129,6 +132,7 @@ class VLNRCMNet(Net):
             # Init the RNN state decoder
             rnn_input_size = vln_config.DEPTH_ENCODER.output_size
             rnn_input_size += vln_config.VISUAL_ENCODER.output_size
+            rnn_input_size += self.prev_action_embedding.embedding_dim
 
             self.state_encoder = RNNStateEncoder(
                 input_size=rnn_input_size,
@@ -202,6 +206,10 @@ class VLNRCMNet(Net):
         rgb_embedding = self.visual_encoder(observations)
         rgb_embedding = torch.flatten(rgb_embedding, 2)
 
+        prev_actions = self.prev_action_embedding(
+            ((prev_actions.float() + 1).view(-1) * masks).long()
+        )
+
         if self.rcm_state_encoder:
             state, rnn_hidden_states = self.state_encoder(
                 rgb_embedding,
@@ -214,7 +222,7 @@ class VLNRCMNet(Net):
             rgb_in = self.rgb_linear(rgb_embedding)
             depth_in = self.depth_linear(depth_embedding)
 
-            state_in = torch.cat([rgb_in, depth_in], dim=1)
+            state_in = torch.cat([rgb_in, depth_in, prev_actions], dim=1)
             state, rnn_hidden_states = self.state_encoder(
                 state_in, rnn_hidden_states, masks
             )
@@ -249,7 +257,13 @@ if __name__ == "__main__":
     from habitat_baselines.config.default import get_config
     from gym import spaces
 
-    config = get_config("../config/vln/dagger_vln.yaml")
+    config = get_config("habitat_baselines/config/vln/il_vln.yaml")
+
+    device = (
+        torch.device("cuda", config.TORCH_GPU_ID)
+        if torch.cuda.is_available()
+        else torch.device("cpu")
+    )
 
     observation_space = spaces.Dict(
         dict(
@@ -262,17 +276,24 @@ if __name__ == "__main__":
         )
     )
 
+    # Add TORCH_GPU_ID to VLN config for a ResNet layer
+    config.defrost()
+    config.VLN.TORCH_GPU_ID = config.TORCH_GPU_ID
+    config.freeze()
+
     action_space = spaces.Discrete(4)
 
-    policy = VLNRCMPolicy(observation_space, action_space, config.RL.VLN)
+    policy = VLNRCMPolicy(observation_space, action_space, config.VLN).to(
+        device
+    )
 
-    dummy_instruction = torch.randint(1, 4, size=(4 * 2, 8))
+    dummy_instruction = torch.randint(1, 4, size=(4 * 2, 8), device=device)
     dummy_instruction[:, 5:] = 0
     dummy_instruction[0, 2:] = 0
 
     obs = dict(
-        rgb=torch.randn(4 * 2, 224, 224, 3),
-        depth=torch.randn(4 * 2, 256, 256, 1),
+        rgb=torch.randn(4 * 2, 224, 224, 3, device=device),
+        depth=torch.randn(4 * 2, 256, 256, 1, device=device),
         instruction=dummy_instruction,
     )
 
@@ -280,9 +301,10 @@ if __name__ == "__main__":
         policy.net.state_encoder.num_recurrent_layers,
         2,
         policy.net._hidden_size,
+        device=device,
     )
-    prev_actions = torch.randint(0, 3, size=(4 * 2,))
-    masks = torch.ones(4 * 2)
+    prev_actions = torch.randint(0, 3, size=(4 * 2,), device=device)
+    masks = torch.ones(4 * 2, device=device)
 
     policy.evaluate_actions(
         obs, hidden_states, prev_actions, masks, prev_actions
