@@ -287,10 +287,7 @@ class TorchVisionResNet50(nn.Module):
             )
 
             def hook(m, i, o):
-                if self.spatial_output:
-                    resnet_output.set_(o)
-                else:
-                    resnet_output.set_(torch.flatten(o, 1).data)
+                resnet_output.set_(o)
 
             # output: [BATCH x RESNET_DIM]
             h = self.layer_extract.register_forward_hook(hook)
@@ -325,5 +322,5 @@ class TorchVisionResNet50(nn.Module):
             return torch.cat([resnet_output, spatial_features], dim=1)
         else:
             return self.activation(
-                self.fc(resnet_output)
+                self.fc(torch.flatten(resnet_output, 1))
             )  # [BATCH x OUTPUT_DIM]

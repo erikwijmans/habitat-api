@@ -455,7 +455,8 @@ class DaggerTrainer(BaseRLTrainer):
         self.envs = None
 
         rgb_hook.remove()
-        depth_hook.remove()
+        if depth_hook is not None:
+            depth_hook.remove()
 
     def _update_agent(
         self,
@@ -557,7 +558,7 @@ class DaggerTrainer(BaseRLTrainer):
                     collate_fn=collate_fn,
                     pin_memory=False,
                     drop_last=True,  # drop last batch if smaller
-                    num_workers=8,
+                    num_workers=3,
                 )
 
                 for epoch in tqdm.trange(self.config.DAGGER.EPOCHS):
