@@ -4,6 +4,9 @@ import torch.jit as jit
 import torch.nn as nn
 import torch.nn.functional as F
 
+from habitat_baselines.models.rcm.relative_positional_attn import (
+    QueriedSpatialCompressionAttnModule,
+)
 from habitat_baselines.models.rnn_state_encoder import RNNStateEncoder
 
 
@@ -28,14 +31,21 @@ class RCMStateEncoder(RNNStateEncoder):
         self._num_recurrent_layers = num_layers
         self._rnn_type = rnn_type
 
-        self.rgb_kv = nn.Conv1d(rgb_input_channels, hidden_size, kernel_size=1)
-        self.depth_kv = nn.Conv1d(
-            depth_input_channels, hidden_size, kernel_size=1
+        self.depth_compress = QueriedSpatialCompressionAttnModule(
+            hidden_size // 2, 4, 4
         )
-        self.q_net = nn.Linear(hidden_size, hidden_size // 2)
+        self.rgb_compress = QueriedSpatialCompressionAttnModule(
+            hidden_size // 2, 7, 7
+        )
 
-        self.register_buffer(
-            "_scale", torch.tensor(1.0 / ((hidden_size // 2) ** 0.5))
+        self.rgb = nn.Conv2d(
+            rgb_input_channels, hidden_size // 2, kernel_size=1
+        )
+        self.depth = nn.Conv2d(
+            depth_input_channels, hidden_size // 2, kernel_size=1
+        )
+        self.q_net = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size // 2), nn.ReLU(True)
         )
 
         self.rnn = getattr(nn, rnn_type)(
@@ -57,13 +67,6 @@ class RCMStateEncoder(RNNStateEncoder):
             else:
                 nn.init.zeros_(param)
 
-    def _attn(self, q, k, v):
-        logits = torch.einsum("nc, nci -> ni", q, k)
-
-        attn = F.softmax(logits * self._scale, dim=1)
-
-        return torch.einsum("ni, nci -> nc", attn, v)
-
     def forward(
         self,
         rgb_embedding,
@@ -79,8 +82,8 @@ class RCMStateEncoder(RNNStateEncoder):
         hidden_states, last_output = hidden_states[0:-1], hidden_states[-1]
         hidden_states = self._unpack_hidden(hidden_states)
 
-        rgb_embedding = self.rgb_kv(rgb_embedding)
-        depth_embedding = self.depth_kv(depth_embedding)
+        rgb_embedding = self.rgb(rgb_embedding)
+        depth_embedding = self.depth(depth_embedding)
 
         # unflatten
         rgb_embedding = _unflatten_helper(rgb_embedding, t, n)
@@ -93,15 +96,10 @@ class RCMStateEncoder(RNNStateEncoder):
             rgb = rgb_embedding[it]
             depth = depth_embedding[it]
 
-            rgb_k, rgb_v = torch.chunk(rgb, chunks=2, dim=1)
-            depth_k, depth_v = torch.chunk(depth, chunks=2, dim=1)
+            q = self.q_net(last_output * masks[it].view(n, 1))
 
-            last_output = last_output * masks[it].view(n, 1)
-
-            q = self.q_net(last_output)
-
-            rgb_attn = self._attn(q, rgb_k, rgb_v)
-            depth_attn = self._attn(q, depth_k, depth_v)
+            rgb_attn = self.rgb_compress(rgb, q)
+            depth_attn = self.depth_compress(depth, q)
 
             rnn_input = torch.cat(
                 [rgb_attn, depth_attn, prev_actions[it]], dim=1
@@ -126,11 +124,11 @@ class RCMStateEncoder(RNNStateEncoder):
 if __name__ == "__main__":
     rcm = RCMStateEncoder(2048, 1024, 256, 32)
 
-    rgb_input = torch.randn(2 * 4, 2048, 7 * 7)
-    depth_input = torch.randn(2 * 4, 1024, 4 * 4)
+    rgb_input = torch.randn(2 * 4, 2048, 7, 7)
+    depth_input = torch.randn(2 * 4, 1024, 4, 4)
     prev_actions = torch.randn(2 * 4, 32)
     masks = torch.randint(1, size=(2 * 4,)).float()
 
     hidden_states = torch.randn(rcm.num_recurrent_layers, 4, 256)
 
-    rcm(rgb_input, depth_input, prev_actions, hidden_states, masks)
+    print(rcm(rgb_input, depth_input, prev_actions, hidden_states, masks))

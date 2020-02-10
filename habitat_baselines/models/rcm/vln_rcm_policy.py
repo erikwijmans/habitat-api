@@ -201,10 +201,8 @@ class VLNRCMNet(Net):
         """
         instruction_embedding = self.instruction_encoder(observations)
         depth_embedding = self.depth_encoder(observations)
-        depth_embedding = torch.flatten(depth_embedding, 2)
 
         rgb_embedding = self.visual_encoder(observations)
-        rgb_embedding = torch.flatten(rgb_embedding, 2)
 
         prev_actions = self.prev_action_embedding(
             ((prev_actions.float() + 1) * masks).long().view(-1)
@@ -219,14 +217,17 @@ class VLNRCMNet(Net):
                 masks,
             )
         else:
-            rgb_in = self.rgb_linear(rgb_embedding)
-            depth_in = self.depth_linear(depth_embedding)
+
+            rgb_in = self.rgb_linear(rgb_embedding.flatten(2))
+            depth_in = self.depth_linear(depth_embedding.flatten(2))
 
             state_in = torch.cat([rgb_in, depth_in, prev_actions], dim=1)
             state, rnn_hidden_states = self.state_encoder(
                 state_in, rnn_hidden_states, masks
             )
 
+        rgb_embedding = torch.flatten(rgb_embedding, 2)
+        depth_embedding = torch.flatten(depth_embedding, 2)
         text_state_q = self.state_q(state)
         text_state_k = self.text_k(instruction_embedding)
         text_mask = (instruction_embedding == 0.0).all(dim=1)
