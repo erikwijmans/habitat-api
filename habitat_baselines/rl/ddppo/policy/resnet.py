@@ -215,7 +215,7 @@ class ResNet(nn.Module):
         )
 
         self.final_channels = self.inplanes
-        self.final_spatial_compress = 1.0 / (2 ** 5)
+        self.num_spatial_compress_stages = 5
 
     def _make_layer(self, block, ngroups, planes, blocks, stride=1):
         downsample = None

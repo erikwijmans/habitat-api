@@ -70,6 +70,7 @@ class ResNetEncoder(nn.Module):
     ):
         super().__init__()
 
+        obs_transform = None
         self.obs_transform = obs_transform
         if self.obs_transform is not None:
             observation_space = self.obs_transform.transform_observation_space(
@@ -78,13 +79,13 @@ class ResNetEncoder(nn.Module):
 
         if "rgb" in observation_space.spaces:
             self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
-            spatial_size = observation_space.spaces["rgb"].shape[0] // 2
+            spatial_size = observation_space.spaces["rgb"].shape[0:2]
         else:
             self._n_input_rgb = 0
 
         if "depth" in observation_space.spaces:
             self._n_input_depth = observation_space.spaces["depth"].shape[2]
-            spatial_size = observation_space.spaces["depth"].shape[0] // 2
+            spatial_size = observation_space.spaces["depth"].shape[0:2]
         else:
             self._n_input_depth = 0
 
@@ -99,12 +100,24 @@ class ResNetEncoder(nn.Module):
             input_channels = self._n_input_depth + self._n_input_rgb
             self.backbone = make_backbone(input_channels, baseplanes, ngroups)
 
-            final_spatial = int(
-                spatial_size * self.backbone.final_spatial_compress
-            )
+            initial_pool_size = 0
+            orig_spatial_size = tuple(spatial_size)
+            while np.prod(spatial_size) > 36:
+                initial_pool_size += 1
+                spatial_size = tuple(
+                    int((v - 1) // initial_pool_size + 1)
+                    for v in orig_spatial_size
+                )
+                for _ in range(self.backbone.num_spatial_compress_stages):
+                    spatial_size = tuple(
+                        int((v - 1) // 2 + 1) for v in spatial_size
+                    )
+
+            self.initial_pool = nn.AvgPool2d(initial_pool_size)
+
             after_compression_flat_size = 2048
             num_compression_channels = int(
-                round(after_compression_flat_size / (final_spatial ** 2))
+                round(after_compression_flat_size / np.prod(spatial_size))
             )
             self.compression = nn.Sequential(
                 nn.Conv2d(
@@ -118,11 +131,7 @@ class ResNetEncoder(nn.Module):
                 nn.ReLU(True),
             )
 
-            self.output_shape = (
-                num_compression_channels,
-                final_spatial,
-                final_spatial,
-            )
+            self.output_shape = (num_compression_channels, *spatial_size)
 
     @property
     def is_blind(self):
@@ -161,7 +170,7 @@ class ResNetEncoder(nn.Module):
             cnn_input = [self.obs_transform(inp) for inp in cnn_input]
 
         x = torch.cat(cnn_input, dim=1)
-        x = F.avg_pool2d(x, 2)
+        x = self.initial_pool(x)
 
         x = self.running_mean_and_var(x)
         x = self.backbone(x)
